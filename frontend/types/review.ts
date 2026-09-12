@@ -10,11 +10,6 @@ export interface DocumentationStep {
   imageUrl?: string;
 }
 
-export interface PlaylistOption {
-  id: string;
-  name: string;
-}
-
 export interface ReviewState {
   projectTitle: string;
   processingStatus: ProcessingStatus;

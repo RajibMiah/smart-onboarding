@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 
-import type { PlaylistOption } from "@/types/review";
+import type { Playlist } from "@/types/playlist";
 
 const CREATE_NEW_VALUE = "__create__";
 
 interface PlaylistAssignerProps {
-  playlists: PlaylistOption[];
+  playlists: Playlist[];
   selectedPlaylistId: string | null;
   onSelect: (id: string) => void;
   onCreate: (name: string) => void;
@@ -75,7 +75,7 @@ export function PlaylistAssigner({ playlists, selectedPlaylistId, onSelect, onCr
           </option>
           {playlists.map((playlist) => (
             <option key={playlist.id} value={playlist.id}>
-              {playlist.name}
+              {playlist.title}
             </option>
           ))}
           <option value={CREATE_NEW_VALUE}>+ Create New Playlist</option>

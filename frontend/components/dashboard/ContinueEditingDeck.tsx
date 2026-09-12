@@ -78,7 +78,7 @@ function ContinuingItemCard({ item, onOpenPage }: { item: ContinuingItem; onOpen
 
 function VideoCard({ item }: { item: ContinuingItem }) {
   return (
-    <EditorialCard>
+    <EditorialCard className="cursor-pointer transition-transform duration-150 hover:-translate-y-0.5">
       <EditorialCard.HeaderStrip categoryLabel="🎥 Recording" metricLabel={item.durationLabel} />
       <EditorialCard.Body
         title={item.title}
@@ -98,7 +98,7 @@ function VideoCard({ item }: { item: ContinuingItem }) {
 
 function PageCard({ item, onOpenPage }: { item: ContinuingItem; onOpenPage: () => void }) {
   return (
-    <EditorialCard>
+    <EditorialCard className="cursor-pointer transition-transform duration-150 hover:-translate-y-0.5">
       <EditorialCard.HeaderStrip categoryLabel="📄 Page" />
       {item.starred && <EditorialCard.TagRow tags={[{ label: "Starred", tone: "yellow" }]} />}
       <EditorialCard.Body
@@ -119,7 +119,7 @@ function PageCard({ item, onOpenPage }: { item: ContinuingItem; onOpenPage: () =
 
 function PlaylistStackCard({ item }: { item: ContinuingItem }) {
   return (
-    <EditorialCard>
+    <EditorialCard className="cursor-pointer transition-transform duration-150 hover:-translate-y-0.5">
       <EditorialCard.HeaderStrip categoryLabel="📑 Playlist" metricLabel={`${item.itemCount ?? 0} clip(s)`} />
       {item.starred && <EditorialCard.TagRow tags={[{ label: "Starred", tone: "yellow" }]} />}
       <EditorialCard.Body
@@ -131,7 +131,7 @@ function PlaylistStackCard({ item }: { item: ContinuingItem }) {
           </div>
         }
       />
-      <EditorialCard.Footer label="▲ Open Playlist" href="/library/playlists" />
+      <EditorialCard.Footer label="▲ Open Playlist" href={`/library/playlists/${item.id}`} />
     </EditorialCard>
   );
 }
