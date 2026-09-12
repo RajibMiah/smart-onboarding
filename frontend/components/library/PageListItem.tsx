@@ -8,13 +8,14 @@ import { ItemActionMenu } from "./ItemActionMenu";
 
 interface PageListItemProps {
   page: PageItem;
+  onOpen?: () => void;
   onRename?: () => void;
   onMoveToProject?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
 }
 
-export function PageListItem({ page, onRename, onMoveToProject, onDuplicate, onDelete }: PageListItemProps) {
+export function PageListItem({ page, onOpen, onRename, onMoveToProject, onDuplicate, onDelete }: PageListItemProps) {
   return (
     <EditorialCard>
       <EditorialCard.HeaderStrip
@@ -51,7 +52,7 @@ export function PageListItem({ page, onRename, onMoveToProject, onDuplicate, onD
         }
       />
 
-      <EditorialCard.Footer label="▲ Open This Page" counter={page.views} />
+      <EditorialCard.Footer label="▲ Open This Page" counter={page.views} onClick={onOpen} />
     </EditorialCard>
   );
 }

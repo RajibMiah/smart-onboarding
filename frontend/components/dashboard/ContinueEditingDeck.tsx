@@ -3,7 +3,9 @@
 import { ChevronLeft, ChevronRight, FileText, ListVideo, MessageCircleQuestion, Play } from "lucide-react";
 
 import { EditorialCard } from "@/components/ui/EditorialCard";
+import { Toast } from "@/components/ui/Toast";
 import { useCarousel } from "@/hooks/useCarousel";
+import { useToast } from "@/hooks/useToast";
 import { CONTINUING_ITEMS } from "@/lib/mock-data";
 import type { ContinuingItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -12,6 +14,7 @@ const DECK_ITEM_CLASSES = "w-72 shrink-0 snap-start";
 
 export function ContinueEditingDeck() {
   const { scrollRef, scrollPrev, scrollNext, canScrollPrev, canScrollNext } = useCarousel();
+  const toast = useToast();
 
   return (
     <section aria-labelledby="continue-editing-heading">
@@ -32,13 +35,14 @@ export function ContinueEditingDeck() {
       >
         {CONTINUING_ITEMS.map((item) => (
           <div key={item.id} className={DECK_ITEM_CLASSES}>
-            <ContinuingItemCard item={item} />
+            <ContinuingItemCard item={item} onOpenPage={() => toast.show("Page editing isn't available in this preview yet.")} />
           </div>
         ))}
         <div className={DECK_ITEM_CLASSES}>
           <RequestsCalloutCard />
         </div>
       </div>
+      {toast.message && <Toast message={toast.message} />}
     </section>
   );
 }
@@ -66,10 +70,10 @@ function DeckNavButton({
   );
 }
 
-function ContinuingItemCard({ item }: { item: ContinuingItem }) {
+function ContinuingItemCard({ item, onOpenPage }: { item: ContinuingItem; onOpenPage: () => void }) {
   if (item.kind === "video") return <VideoCard item={item} />;
   if (item.kind === "playlist") return <PlaylistStackCard item={item} />;
-  return <PageCard item={item} />;
+  return <PageCard item={item} onOpenPage={onOpenPage} />;
 }
 
 function VideoCard({ item }: { item: ContinuingItem }) {
@@ -87,12 +91,12 @@ function VideoCard({ item }: { item: ContinuingItem }) {
           </div>
         }
       />
-      <EditorialCard.Footer label="▲ Open in Studio" />
+      <EditorialCard.Footer label="▲ Open in Studio" href={`/studio?clip=${item.id}`} />
     </EditorialCard>
   );
 }
 
-function PageCard({ item }: { item: ContinuingItem }) {
+function PageCard({ item, onOpenPage }: { item: ContinuingItem; onOpenPage: () => void }) {
   return (
     <EditorialCard>
       <EditorialCard.HeaderStrip categoryLabel="📄 Page" />
@@ -108,7 +112,7 @@ function PageCard({ item }: { item: ContinuingItem }) {
           </div>
         }
       />
-      <EditorialCard.Footer label="▲ Open Page" />
+      <EditorialCard.Footer label="▲ Open Page" onClick={onOpenPage} />
     </EditorialCard>
   );
 }
@@ -127,7 +131,7 @@ function PlaylistStackCard({ item }: { item: ContinuingItem }) {
           </div>
         }
       />
-      <EditorialCard.Footer label="▲ Open Playlist" />
+      <EditorialCard.Footer label="▲ Open Playlist" href="/library/playlists" />
     </EditorialCard>
   );
 }

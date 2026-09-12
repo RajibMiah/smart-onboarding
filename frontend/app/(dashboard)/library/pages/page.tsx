@@ -117,6 +117,7 @@ export default function PagesLibraryPage() {
             <PageListItem
               key={page.id}
               page={page}
+              onOpen={() => toast.show("Page editing isn't available in this preview yet.")}
               onRename={() => renamePage(page.id, page.title)}
               onMoveToProject={() => toast.show("Projects aren't available yet — check back soon.")}
               onDuplicate={() => duplicatePage(page.id)}
