@@ -1,17 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { addClip } from "@/lib/library-mock-data";
+import { addClipToPlaylist, addPlaylist, getPlaylistsSnapshot, subscribeToPlaylists } from "@/lib/playlist-mock-data";
 import type { ClipItem } from "@/types/library";
-import type { DocumentationStep, PlaylistOption, ProcessingStatus } from "@/types/review";
-
-const DEFAULT_PLAYLISTS: PlaylistOption[] = [
-  { id: "onboarding-2026", name: "Onboarding 2026" },
-  { id: "product-tutorials", name: "Product Tutorials" },
-  { id: "engineering-guides", name: "Engineering Guides" },
-];
+import type { DocumentationStep, ProcessingStatus } from "@/types/review";
 
 /** Simulated processing delay — there's no real transcoding backend yet. */
 const PROCESSING_DURATION_MS = 3000;
@@ -22,9 +17,14 @@ interface UseReviewWorkflowOptions {
   hasMedia: boolean;
 }
 
-/** Owns the whole Review & Publish page's state, per `types/review.ts`. */
+/**
+ * Owns the whole Review & Publish page's state, per `types/review.ts`.
+ * Playlists come from the same shared store the `/library/playlists` page
+ * reads/writes, so assigning one here for real links the saved clip into it.
+ */
 export function useReviewWorkflow({ initialTitle, hasMedia }: UseReviewWorkflowOptions) {
   const router = useRouter();
+  const playlists = useSyncExternalStore(subscribeToPlaylists, getPlaylistsSnapshot, getPlaylistsSnapshot);
 
   const [projectTitle, setProjectTitle] = useState(initialTitle);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -33,7 +33,6 @@ export function useReviewWorkflow({ initialTitle, hasMedia }: UseReviewWorkflowO
   // a timer rather than something computable from props on every render.
   const [timedStatus, setTimedStatus] = useState<"processing" | "ready">("processing");
   const [isPublished, setIsPublished] = useState(false);
-  const [playlists, setPlaylists] = useState<PlaylistOption[]>(DEFAULT_PLAYLISTS);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
   const [description, setDescription] = useState("");
@@ -63,9 +62,10 @@ export function useReviewWorkflow({ initialTitle, hasMedia }: UseReviewWorkflowO
   const createPlaylist = useCallback((name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const id = crypto.randomUUID();
-    setPlaylists((prev) => [...prev, { id, name: trimmed }]);
-    setSelectedPlaylistId(id);
+    // Quick-create defaults to private — the full Playlists page's own "+ New
+    // Playlist" modal is where visibility gets asked explicitly.
+    const playlist = addPlaylist({ title: trimmed, visibility: "private" });
+    setSelectedPlaylistId(playlist.id);
     setPlaylistError(null);
   }, []);
 
@@ -99,6 +99,7 @@ export function useReviewWorkflow({ initialTitle, hasMedia }: UseReviewWorkflowO
         comments: 0,
       };
       addClip(clip);
+      addClipToPlaylist(selectedPlaylistId, clip.id);
       router.push("/library/clips");
     },
     [selectedPlaylistId, projectTitle, isPublished, router],
