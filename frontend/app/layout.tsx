@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "APC",
-  description: "AI Paper Click — an AI-powered onboarding video tutorial and documentation platform.",
+  description: "AI Paper Clip — an AI-powered onboarding video tutorial and documentation platform.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
