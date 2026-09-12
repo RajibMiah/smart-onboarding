@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { createTimelineClipFromAsset } from "@/lib/editor/create-clip";
-import { clipTimelineEnd, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
+import { clipTimelineEnd, type CanvasAspectRatio, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
 
 const MAX_HISTORY = 50;
 
@@ -24,6 +24,7 @@ interface EditorState {
   zoomLevel: number;
   selectedClipId: string | null;
   snappingEnabled: boolean;
+  canvasAspectRatio: CanvasAspectRatio;
   history: { past: TimelineClip[][]; future: TimelineClip[][] };
 }
 
@@ -45,6 +46,7 @@ type Action =
   | { type: "TOGGLE_PLAY" }
   | { type: "SET_ZOOM"; zoom: number }
   | { type: "TOGGLE_SNAPPING" }
+  | { type: "SET_CANVAS_ASPECT_RATIO"; aspectRatio: CanvasAspectRatio }
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET_PROJECT" };
@@ -57,6 +59,7 @@ const INITIAL_STATE: EditorState = {
   zoomLevel: 60,
   selectedClipId: null,
   snappingEnabled: true,
+  canvasAspectRatio: "16:9",
   history: { past: [], future: [] },
 };
 
@@ -183,6 +186,9 @@ function editorReducer(state: EditorState, action: Action): EditorState {
     case "TOGGLE_SNAPPING":
       return { ...state, snappingEnabled: !state.snappingEnabled };
 
+    case "SET_CANVAS_ASPECT_RATIO":
+      return { ...state, canvasAspectRatio: action.aspectRatio };
+
     case "UNDO": {
       const previous = state.history.past.at(-1);
       if (!previous) return state;
@@ -243,6 +249,7 @@ interface EditorContextValue {
   togglePlay: () => void;
   setZoom: (zoom: number) => void;
   toggleSnapping: () => void;
+  setCanvasAspectRatio: (aspectRatio: CanvasAspectRatio) => void;
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
@@ -280,6 +287,10 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const togglePlay = useCallback(() => dispatch({ type: "TOGGLE_PLAY" }), []);
   const setZoom = useCallback((zoom: number) => dispatch({ type: "SET_ZOOM", zoom }), []);
   const toggleSnapping = useCallback(() => dispatch({ type: "TOGGLE_SNAPPING" }), []);
+  const setCanvasAspectRatio = useCallback(
+    (aspectRatio: CanvasAspectRatio) => dispatch({ type: "SET_CANVAS_ASPECT_RATIO", aspectRatio }),
+    [],
+  );
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
@@ -321,6 +332,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       togglePlay,
       setZoom,
       toggleSnapping,
+      setCanvasAspectRatio,
       undo,
       redo,
       resetProject,
@@ -348,6 +360,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       togglePlay,
       setZoom,
       toggleSnapping,
+      setCanvasAspectRatio,
       undo,
       redo,
       resetProject,

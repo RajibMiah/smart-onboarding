@@ -5,6 +5,13 @@ import { Camera, FolderOpen, Plus, ScanLine, Upload, UploadCloud } from "lucide-
 
 import { useEditor } from "@/context/EditorContext";
 import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
+import type { CanvasAspectRatio } from "@/lib/editor/types";
+
+const ASPECT_RATIO_CSS: Record<CanvasAspectRatio, string> = {
+  "16:9": "16 / 9",
+  "9:16": "9 / 16",
+  "1:1": "1 / 1",
+};
 
 interface VideoCanvasProps {
   onStartScreenRecording: () => void;
@@ -21,22 +28,31 @@ export function VideoCanvas({
   onOpenLibrary,
   onTurnSlides,
 }: VideoCanvasProps) {
-  const { videoClips } = useEditor();
+  const { videoClips, state } = useEditor();
   const { videoRef, activeClip } = useTimelinePlayback();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const hasMedia = videoClips.length > 0;
 
   return (
-    <section className="relative flex min-w-0 flex-1 flex-col items-center justify-center bg-neutral-900 p-6">
+    <section className="relative flex min-w-0 flex-1 items-center justify-center bg-neutral-900 p-6">
       {/* The <video> element is mounted persistently (not conditionally) so
-          useTimelinePlayback's ref never goes stale between clip switches. */}
-      <video
-        ref={videoRef}
-        className="max-h-full max-w-full bg-black shadow-popover"
-        style={{ display: hasMedia ? "block" : "none" }}
-        playsInline
-      />
+          useTimelinePlayback's ref never goes stale between clip switches.
+          The wrapping box reshapes to the Settings panel's aspect-ratio
+          choice; `visibility` (not `display`) keeps it in flow so the empty
+          state below can sit in the same stacking context without a jump
+          when media first loads. */}
+      <div
+        className="relative flex h-full max-h-full w-auto max-w-full items-center justify-center"
+        style={{ aspectRatio: ASPECT_RATIO_CSS[state.canvasAspectRatio] }}
+      >
+        <video
+          ref={videoRef}
+          className="h-full w-full bg-black object-contain shadow-popover"
+          style={{ visibility: hasMedia ? "visible" : "hidden" }}
+          playsInline
+        />
+      </div>
 
       {hasMedia && !activeClip && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-neutral-400">
@@ -45,7 +61,7 @@ export function VideoCanvas({
       )}
 
       {!hasMedia && (
-        <div className="flex max-w-md flex-col items-center gap-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-6 text-center">
           <span className="flex h-14 w-14 items-center justify-center border-2 border-white/30">
             <Plus className="h-7 w-7 text-neutral-300" />
           </span>

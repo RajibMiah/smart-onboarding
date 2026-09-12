@@ -1,16 +1,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import {
-  Camera,
-  ChevronDown,
-  Film,
-  FolderOpen,
-  MoreVertical,
-  ScanLine,
-  Upload,
-  UploadCloud,
-} from "lucide-react";
+import { Camera, FolderOpen, MoreVertical, ScanLine, Upload, UploadCloud } from "lucide-react";
 
 import { useEditor } from "@/context/EditorContext";
 import { useClickOutside } from "@/hooks/useClickOutside";
@@ -21,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 const ACCEPTED_UPLOAD_TYPES = ".mp4,.mov,.webm";
 
-interface MediaDrawerProps {
+interface MediaPanelProps {
   isRecording: boolean;
   recordingSource: RecordingSource | null;
   onStartScreenRecording: () => void;
@@ -29,12 +20,11 @@ interface MediaDrawerProps {
   onStopRecording: () => void;
   onUploadFiles: (files: FileList) => void;
   onTurnSlides: () => void;
-  onCollapse: () => void;
 }
 
 type DrawerTab = "timeline" | "previous";
 
-export function MediaDrawer({
+export function MediaPanel({
   isRecording,
   recordingSource,
   onStartScreenRecording,
@@ -42,8 +32,7 @@ export function MediaDrawer({
   onStopRecording,
   onUploadFiles,
   onTurnSlides,
-  onCollapse,
-}: MediaDrawerProps) {
+}: MediaPanelProps) {
   const {
     videoClips,
     state: { mediaBin },
@@ -66,19 +55,7 @@ export function MediaDrawer({
   }
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-r-2 border-black bg-white">
-      <div className="flex items-center justify-between border-b-2 border-black px-4 py-3">
-        <span className="text-sm font-bold text-black">Media</span>
-        <button
-          type="button"
-          onClick={onCollapse}
-          aria-label="Collapse media panel"
-          className="p-1 text-black transition hover:bg-neutral-100"
-        >
-          <ChevronDown className="h-4 w-4 -rotate-90" />
-        </button>
-      </div>
-
+    <div className="flex h-full flex-col">
       <div className="grid grid-cols-2 gap-2 p-3">
         <QuickActionButton
           icon={ScanLine}
@@ -168,7 +145,7 @@ export function MediaDrawer({
           </div>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
 
@@ -216,7 +193,7 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 border-2 border-dashed border-black p-6 text-center">
-      <Film className="h-6 w-6 text-neutral-400" />
+      <FolderOpen className="h-6 w-6 text-neutral-400" />
       <p className="text-xs text-neutral-500">{message}</p>
     </div>
   );
