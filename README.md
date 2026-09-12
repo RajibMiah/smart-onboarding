@@ -9,7 +9,7 @@ AI-powered onboarding video tutorial & documentation platform.
 | [Architecture](docs/architecture.md) | Stack, project layout tree |
 | [Pages](docs/pages.md) | Route → screenshot map |
 | [Setup](docs/setup.md) | Prerequisites, first-time setup, verify, everyday commands |
-| [Configuration](docs/configuration.md) | `.env` files for backend & frontend |
+| [Configuration](docs/configuration.md) | `.env` files for Docker Compose, backend & frontend |
 | [Branching workflow](docs/branching.md) | `main` / `dev` / `test` / `feat/*` convention |
 
 ## Screenshots
