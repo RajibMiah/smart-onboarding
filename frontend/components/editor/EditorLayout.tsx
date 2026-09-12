@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Cloud, Trash2 } from "lucide-react";
 
 import { Toast } from "@/components/ui/Toast";
-import { EditorProvider, useEditor } from "@/context/EditorContext";
+import { useEditor } from "@/context/EditorContext";
 import { useMediaIngestion } from "@/hooks/useMediaIngestion";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import { useStudioTool } from "@/hooks/useStudioTool";
@@ -26,18 +27,20 @@ import { SettingsPanel } from "./panels/SettingsPanel";
 import { TextPanel } from "./panels/TextPanel";
 import { ZoomPanel } from "./panels/ZoomPanel";
 
-/** Complete Video Studio & Timeline Editor shell — self-contained, owns its own state provider. */
+/**
+ * Complete Video Studio & Timeline Editor shell. The `EditorProvider` now
+ * lives in `app/studio/layout.tsx` (a sibling to this page and to
+ * `/studio/review`) so the same editing session survives the client-side
+ * navigation to the review step instead of resetting.
+ */
 export function EditorLayout() {
-  return (
-    <EditorProvider>
-      <EditorLayoutInner />
-    </EditorProvider>
-  );
+  return <EditorLayoutInner />;
 }
 
 function EditorLayoutInner() {
   const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject, state, cancelZoomDrawing } =
     useEditor();
+  const router = useRouter();
   const toast = useToast();
   const { ingest } = useMediaIngestion();
   const studioTool = useStudioTool("media");
@@ -171,7 +174,7 @@ function EditorLayoutInner() {
 
   return (
     <div ref={studioRef} className="flex h-screen flex-col bg-white">
-      <EditorHeader onDeleteProject={handleDeleteProject} onNext={() => toast.show("Publishing isn't available in this offline preview yet.")} />
+      <EditorHeader onDeleteProject={handleDeleteProject} onNext={() => router.push("/studio/review")} />
 
       <div className="flex min-h-0 flex-1">
         <StudioToolRail
