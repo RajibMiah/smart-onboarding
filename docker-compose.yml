@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: smart-onboarding-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: smart_onboarding
+      MYSQL_USER: onboarding_user
+      MYSQL_PASSWORD: onboarding_pass
+      MYSQL_ROOT_PASSWORD: onboarding_root_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ponboarding_root_pass"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
