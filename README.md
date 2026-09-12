@@ -2,6 +2,16 @@
 
 AI-powered onboarding video tutorial & documentation platform.
 
+## Documentation
+
+| Doc | Covers |
+|---|---|
+| [Architecture](docs/architecture.md) | Stack, project layout tree |
+| [Pages](docs/pages.md) | Route → screenshot map |
+| [Setup](docs/setup.md) | Prerequisites, first-time setup, verify, everyday commands |
+| [Configuration](docs/configuration.md) | `.env` files for backend & frontend |
+| [Branching workflow](docs/branching.md) | `main` / `dev` / `test` / `feat/*` convention |
+
 ## Screenshots
 
 One screenshot per page — see [docs/pages.md](docs/pages.md) for how each
@@ -44,13 +54,3 @@ maps to a route in the code.
 ![Shared with me](docs/screenshots/shared.png)
 
 </details>
-
-## Documentation
-
-| Doc | Covers |
-|---|---|
-| [Architecture](docs/architecture.md) | Stack, project layout tree |
-| [Pages](docs/pages.md) | Route → screenshot map |
-| [Setup](docs/setup.md) | Prerequisites, first-time setup, verify, everyday commands |
-| [Configuration](docs/configuration.md) | `.env` files for backend & frontend |
-| [Branching workflow](docs/branching.md) | `main` / `dev` / `test` / `feat/*` convention |
