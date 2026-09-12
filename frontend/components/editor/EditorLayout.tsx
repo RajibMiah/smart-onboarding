@@ -208,7 +208,7 @@ function EditorHeader({ onDeleteProject, onNext }: { onDeleteProject: () => void
         <span className="flex h-7 w-7 items-center justify-center bg-black text-xs font-bold text-white">
           APC
         </span>
-        <span className="text-sm font-semibold text-black">AI Paper Click Studio</span>
+        <span className="text-sm font-semibold text-black">AI Paper Clip Studio</span>
       </Link>
 
       <div className="flex items-center gap-2">

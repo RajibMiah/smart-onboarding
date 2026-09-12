@@ -8,7 +8,7 @@
 ## Option A: Docker (whole stack)
 
 ```bash
-cp .env.example .env   # edit values if you want, defaults work as-is
+cp .env.example .env   # then fill in every value — see docs/configuration.md
 docker compose up --build
 ```
 
@@ -41,7 +41,7 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env            # backend/.env.example — defaults match docker-compose.yml
+cp .env.example .env            # backend/.env.example — fill in every value, see docs/configuration.md
 python manage.py migrate
 python manage.py runserver 8000
 

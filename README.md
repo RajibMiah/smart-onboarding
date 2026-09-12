@@ -1,4 +1,4 @@
-# Smart Onboarding — AI Paper Click (APC)
+# Smart Onboarding — AI Paper Clip (APC)
 
 AI-powered onboarding video tutorial & documentation platform.
 
