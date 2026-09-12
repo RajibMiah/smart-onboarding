@@ -11,8 +11,11 @@ import {
 
 import { createTimelineClipFromAsset } from "@/lib/editor/create-clip";
 import { clipTimelineEnd, type CanvasAspectRatio, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
+import type { ZoomRegion, ZoomRegionBounds } from "@/types/zoom";
 
 const MAX_HISTORY = 50;
+const DEFAULT_ZOOM_DURATION_SECONDS = 3;
+const DEFAULT_ZOOM_SCALE = 1.5;
 
 interface EditorState {
   tracks: TimelineClip[];
@@ -25,6 +28,9 @@ interface EditorState {
   selectedClipId: string | null;
   snappingEnabled: boolean;
   canvasAspectRatio: CanvasAspectRatio;
+  zoomRegions: ZoomRegion[];
+  /** True while the video canvas is in marquee-drawing mode for a new zoom region. */
+  isDrawingZoom: boolean;
   history: { past: TimelineClip[][]; future: TimelineClip[][] };
 }
 
@@ -47,6 +53,11 @@ type Action =
   | { type: "SET_ZOOM"; zoom: number }
   | { type: "TOGGLE_SNAPPING" }
   | { type: "SET_CANVAS_ASPECT_RATIO"; aspectRatio: CanvasAspectRatio }
+  | { type: "START_ZOOM_DRAWING" }
+  | { type: "CANCEL_ZOOM_DRAWING" }
+  | { type: "ADD_ZOOM_REGION"; region: ZoomRegion }
+  | { type: "UPDATE_ZOOM_REGION"; id: string; changes: Partial<ZoomRegion> }
+  | { type: "REMOVE_ZOOM_REGION"; id: string }
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET_PROJECT" };
@@ -60,6 +71,8 @@ const INITIAL_STATE: EditorState = {
   selectedClipId: null,
   snappingEnabled: true,
   canvasAspectRatio: "16:9",
+  zoomRegions: [],
+  isDrawingZoom: false,
   history: { past: [], future: [] },
 };
 
@@ -189,6 +202,24 @@ function editorReducer(state: EditorState, action: Action): EditorState {
     case "SET_CANVAS_ASPECT_RATIO":
       return { ...state, canvasAspectRatio: action.aspectRatio };
 
+    case "START_ZOOM_DRAWING":
+      return { ...state, isDrawingZoom: true };
+
+    case "CANCEL_ZOOM_DRAWING":
+      return { ...state, isDrawingZoom: false };
+
+    case "ADD_ZOOM_REGION":
+      return { ...state, zoomRegions: [...state.zoomRegions, action.region], isDrawingZoom: false };
+
+    case "UPDATE_ZOOM_REGION":
+      return {
+        ...state,
+        zoomRegions: state.zoomRegions.map((region) => (region.id === action.id ? { ...region, ...action.changes } : region)),
+      };
+
+    case "REMOVE_ZOOM_REGION":
+      return { ...state, zoomRegions: state.zoomRegions.filter((region) => region.id !== action.id) };
+
     case "UNDO": {
       const previous = state.history.past.at(-1);
       if (!previous) return state;
@@ -231,6 +262,8 @@ interface EditorContextValue {
   totalDuration: number;
   canUndo: boolean;
   canRedo: boolean;
+  /** The zoom region (if any) covering the current playhead. */
+  activeZoomRegion: ZoomRegion | null;
 
   addClip: (clip: TimelineClip) => void;
   removeClip: (id: string) => void;
@@ -250,6 +283,11 @@ interface EditorContextValue {
   setZoom: (zoom: number) => void;
   toggleSnapping: () => void;
   setCanvasAspectRatio: (aspectRatio: CanvasAspectRatio) => void;
+  startZoomDrawing: () => void;
+  cancelZoomDrawing: () => void;
+  addZoomRegion: (bounds: ZoomRegionBounds) => void;
+  updateZoomRegion: (id: string, changes: Partial<ZoomRegion>) => void;
+  removeZoomRegion: (id: string) => void;
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
@@ -291,6 +329,29 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     (aspectRatio: CanvasAspectRatio) => dispatch({ type: "SET_CANVAS_ASPECT_RATIO", aspectRatio }),
     [],
   );
+  const startZoomDrawing = useCallback(() => dispatch({ type: "START_ZOOM_DRAWING" }), []);
+  const cancelZoomDrawing = useCallback(() => dispatch({ type: "CANCEL_ZOOM_DRAWING" }), []);
+  const addZoomRegion = useCallback(
+    (bounds: ZoomRegionBounds) => {
+      dispatch({
+        type: "ADD_ZOOM_REGION",
+        region: {
+          id: crypto.randomUUID(),
+          name: `Zoom ${state.zoomRegions.length + 1}`,
+          startTime: state.currentTime,
+          endTime: state.currentTime + DEFAULT_ZOOM_DURATION_SECONDS,
+          scale: DEFAULT_ZOOM_SCALE,
+          bounds,
+        },
+      });
+    },
+    [state.currentTime, state.zoomRegions.length],
+  );
+  const updateZoomRegion = useCallback(
+    (id: string, changes: Partial<ZoomRegion>) => dispatch({ type: "UPDATE_ZOOM_REGION", id, changes }),
+    [],
+  );
+  const removeZoomRegion = useCallback((id: string) => dispatch({ type: "REMOVE_ZOOM_REGION", id }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
@@ -305,6 +366,10 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     () => state.tracks.reduce((max, clip) => Math.max(max, clipTimelineEnd(clip)), 0),
     [state.tracks],
   );
+  const activeZoomRegion = useMemo(
+    () => state.zoomRegions.find((region) => state.currentTime >= region.startTime && state.currentTime < region.endTime) ?? null,
+    [state.zoomRegions, state.currentTime],
+  );
 
   const value = useMemo<EditorContextValue>(
     () => ({
@@ -315,6 +380,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       totalDuration,
       canUndo: state.history.past.length > 0,
       canRedo: state.history.future.length > 0,
+      activeZoomRegion,
       addClip,
       removeClip,
       updateClip,
@@ -333,6 +399,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       setZoom,
       toggleSnapping,
       setCanvasAspectRatio,
+      startZoomDrawing,
+      cancelZoomDrawing,
+      addZoomRegion,
+      updateZoomRegion,
+      removeZoomRegion,
       undo,
       redo,
       resetProject,
@@ -343,6 +414,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       audioClips,
       selectedClip,
       totalDuration,
+      activeZoomRegion,
       addClip,
       removeClip,
       updateClip,
@@ -361,6 +433,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       setZoom,
       toggleSnapping,
       setCanvasAspectRatio,
+      startZoomDrawing,
+      cancelZoomDrawing,
+      addZoomRegion,
+      updateZoomRegion,
+      removeZoomRegion,
       undo,
       redo,
       resetProject,

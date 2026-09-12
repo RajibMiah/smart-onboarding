@@ -36,7 +36,8 @@ export function EditorLayout() {
 }
 
 function EditorLayoutInner() {
-  const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject } = useEditor();
+  const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject, state, cancelZoomDrawing } =
+    useEditor();
   const toast = useToast();
   const { ingest } = useMediaIngestion();
   const studioTool = useStudioTool("media");
@@ -119,11 +120,14 @@ function EditorLayoutInner() {
       } else if (event.key.toLowerCase() === "s" && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         splitClipAtPlayhead();
+      } else if (event.key === "Escape" && state.isDrawingZoom) {
+        event.preventDefault();
+        cancelZoomDrawing();
       }
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [togglePlay, selectedClip, removeClip, undo, redo, splitClipAtPlayhead]);
+  }, [togglePlay, selectedClip, removeClip, undo, redo, splitClipAtPlayhead, state.isDrawingZoom, cancelZoomDrawing]);
 
   const handleDeleteProject = useCallback(() => {
     if (videoClips.length === 0) return;
