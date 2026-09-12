@@ -1,30 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Clapperboard,
-  Cloud,
-  MoreHorizontal,
-  Music,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { ArrowRight, Cloud, Trash2 } from "lucide-react";
 
 import { Toast } from "@/components/ui/Toast";
 import { EditorProvider, useEditor } from "@/context/EditorContext";
 import { useMediaIngestion } from "@/hooks/useMediaIngestion";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
+import { useStudioTool } from "@/hooks/useStudioTool";
 import { useToast } from "@/hooks/useToast";
 import { probeMediaDuration } from "@/lib/editor/media-utils";
-import { cn } from "@/lib/utils";
+import type { StudioTool } from "@/types/studio";
 
-import { MediaDrawer } from "./MediaDrawer";
+import { StudioDrawer } from "./StudioDrawer";
+import { StudioToolRail } from "./StudioToolRail";
 import { Timeline } from "./Timeline";
 import { VideoCanvas } from "./VideoCanvas";
-
-type ToolPanel = "auto-edit" | "media" | "audio" | "more";
+import { AudioPanel } from "./panels/AudioPanel";
+import { AutoEditPanel } from "./panels/AutoEditPanel";
+import { BlurPanel } from "./panels/BlurPanel";
+import { ElementsPanel } from "./panels/ElementsPanel";
+import { MediaPanel } from "./panels/MediaPanel";
+import { SettingsPanel } from "./panels/SettingsPanel";
+import { TextPanel } from "./panels/TextPanel";
+import { ZoomPanel } from "./panels/ZoomPanel";
 
 /** Complete Video Studio & Timeline Editor shell — self-contained, owns its own state provider. */
 export function EditorLayout() {
@@ -39,9 +39,8 @@ function EditorLayoutInner() {
   const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject } = useEditor();
   const toast = useToast();
   const { ingest } = useMediaIngestion();
+  const studioTool = useStudioTool("media");
 
-  const [drawerOpen, setDrawerOpen] = useState(true);
-  const [activePanel, setActivePanel] = useState<ToolPanel>("media");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const studioRef = useRef<HTMLDivElement>(null);
 
@@ -58,10 +57,7 @@ function EditorLayoutInner() {
     if (recorder.error) toast.show(recorder.error);
   }, [recorder.error, toast]);
 
-  const openMediaPanel = useCallback(() => {
-    setActivePanel("media");
-    setDrawerOpen(true);
-  }, []);
+  const openMediaPanel = useCallback(() => studioTool.openTool("media"), [studioTool]);
 
   const handleUploadFiles = useCallback(
     async (files: FileList) => {
@@ -136,30 +132,13 @@ function EditorLayoutInner() {
     }
   }, [videoClips.length, resetProject]);
 
-  return (
-    <div ref={studioRef} className="flex h-screen flex-col bg-white">
-      <EditorHeader onDeleteProject={handleDeleteProject} onNext={() => toast.show("Publishing isn't available in this offline preview yet.")} />
-
-      <div className="flex min-h-0 flex-1">
-        <ToolRail
-          activePanel={activePanel}
-          drawerOpen={drawerOpen}
-          onSelectPanel={(panel) => {
-            if (panel === "auto-edit" || panel === "more") {
-              toast.show(`${panel === "auto-edit" ? "Auto-edit" : "More tools"} isn't available in this offline preview yet.`);
-              return;
-            }
-            if (activePanel === panel && drawerOpen) {
-              setDrawerOpen(false);
-            } else {
-              setActivePanel(panel);
-              setDrawerOpen(true);
-            }
-          }}
-        />
-
-        {drawerOpen && activePanel === "media" && (
-          <MediaDrawer
+  function renderActivePanel(tool: StudioTool): ReactNode {
+    switch (tool) {
+      case "auto-edit":
+        return <AutoEditPanel onNotify={toast.show} />;
+      case "media":
+        return (
+          <MediaPanel
             isRecording={recorder.isRecording}
             recordingSource={recorder.recordingSource}
             onStartScreenRecording={recorder.startScreenRecording}
@@ -167,15 +146,41 @@ function EditorLayoutInner() {
             onStopRecording={recorder.stopRecording}
             onUploadFiles={handleUploadFiles}
             onTurnSlides={handleTurnSlides}
-            onCollapse={() => setDrawerOpen(false)}
           />
-        )}
+        );
+      case "audio":
+        return <AudioPanel onNotify={toast.show} />;
+      case "blur":
+        return <BlurPanel onNotify={toast.show} />;
+      case "text":
+        return <TextPanel onNotify={toast.show} />;
+      case "elements":
+        return <ElementsPanel onNotify={toast.show} />;
+      case "zoom":
+        return <ZoomPanel onNotify={toast.show} />;
+      case "settings":
+        return <SettingsPanel onNotify={toast.show} />;
+      default:
+        return null;
+    }
+  }
 
-        {drawerOpen && activePanel === "audio" && (
-          <aside className="flex w-80 shrink-0 items-center justify-center border-r-2 border-black bg-white p-6 text-center text-sm text-neutral-500">
-            Audio-only capture and library tools aren&apos;t available in this offline preview yet.
-          </aside>
-        )}
+  return (
+    <div ref={studioRef} className="flex h-screen flex-col bg-white">
+      <EditorHeader onDeleteProject={handleDeleteProject} onNext={() => toast.show("Publishing isn't available in this offline preview yet.")} />
+
+      <div className="flex min-h-0 flex-1">
+        <StudioToolRail
+          activeTool={studioTool.activeTool}
+          isDrawerOpen={studioTool.isDrawerOpen}
+          isRailExpanded={studioTool.isRailExpanded}
+          onSelectTool={studioTool.selectTool}
+          onToggleExpanded={studioTool.toggleRailExpanded}
+        />
+
+        <StudioDrawer activeTool={studioTool.activeTool} isOpen={studioTool.isDrawerOpen} onCollapse={studioTool.closeDrawer}>
+          {renderActivePanel(studioTool.activeTool)}
+        </StudioDrawer>
 
         <VideoCanvas
           onStartScreenRecording={recorder.startScreenRecording}
@@ -226,46 +231,5 @@ function EditorHeader({ onDeleteProject, onNext }: { onDeleteProject: () => void
         </button>
       </div>
     </header>
-  );
-}
-
-function ToolRail({
-  activePanel,
-  drawerOpen,
-  onSelectPanel,
-}: {
-  activePanel: ToolPanel;
-  drawerOpen: boolean;
-  onSelectPanel: (panel: ToolPanel) => void;
-}) {
-  const items: { id: ToolPanel; label: string; icon: ComponentType<{ className?: string }> }[] = [
-    { id: "auto-edit", label: "Auto-edit", icon: Sparkles },
-    { id: "media", label: "Media", icon: Clapperboard },
-    { id: "audio", label: "Audio", icon: Music },
-    { id: "more", label: "More", icon: MoreHorizontal },
-  ];
-
-  return (
-    <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r-2 border-black bg-white py-3">
-      {items.map(({ id, label, icon: Icon }) => {
-        const active = activePanel === id && drawerOpen;
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onSelectPanel(id)}
-            title={label}
-            aria-pressed={active}
-            className={cn(
-              "flex w-12 flex-col items-center gap-1 py-2 text-[10px] font-medium transition",
-              active ? "bg-brand-yellow text-black" : "text-neutral-500 hover:bg-neutral-100",
-            )}
-          >
-            <Icon className="h-5 w-5" />
-            {label}
-          </button>
-        );
-      })}
-    </nav>
   );
 }

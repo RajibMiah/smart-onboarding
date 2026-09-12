@@ -2,6 +2,8 @@
 
 export type ClipKind = "video" | "audio";
 
+export type CanvasAspectRatio = "16:9" | "9:16" | "1:1";
+
 export interface TimelineClip {
   id: string;
   type: ClipKind;
