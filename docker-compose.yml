@@ -3,20 +3,64 @@ services:
     image: mysql:8.4
     container_name: smart-onboarding-mysql
     restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: smart_onboarding
-      MYSQL_USER: onboarding_user
-      MYSQL_PASSWORD: onboarding_pass
-      MYSQL_ROOT_PASSWORD: onboarding_root_pass
+    env_file:
+      - .env
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ponboarding_root_pass"]
+      # CMD-SHELL (not exec-form CMD) so $MYSQL_ROOT_PASSWORD actually expands
+      # — keeps the password out of the compose file and out of `docker inspect`.
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\""]
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - smart-onboarding
+
+  backend:
+    build:
+      context: ./backend
+    container_name: smart-onboarding-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - smart-onboarding
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Build-time only (baked into the client bundle) — `env_file` above
+        # only affects runtime, so this still needs an explicit reference.
+        # Compose resolves `${...}` from the root `.env` automatically.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: smart-onboarding-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    networks:
+      - smart-onboarding
+
+networks:
+  smart-onboarding:
+    driver: bridge
 
 volumes:
   mysql_data:

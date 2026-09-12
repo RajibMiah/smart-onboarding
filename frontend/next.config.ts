@@ -7,6 +7,11 @@ import type { NextConfig } from "next";
  * single-threaded) rather than failing — see `hooks/useFFmpegWasm.ts`.
  */
 const nextConfig: NextConfig = {
+  // Traces only the dependencies each route actually needs into
+  // `.next/standalone` — the Dockerfile copies just that, not all of
+  // node_modules, for a much smaller production image.
+  output: "standalone",
+
   async headers() {
     return [
       {
