@@ -11,11 +11,14 @@ import {
 
 import { createTimelineClipFromAsset } from "@/lib/editor/create-clip";
 import { clipTimelineEnd, type CanvasAspectRatio, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
+import type { BlurRegion, BoundingBox, TextRegion } from "@/types/overlays";
 import type { ZoomRegion, ZoomRegionBounds } from "@/types/zoom";
 
 const MAX_HISTORY = 50;
 const DEFAULT_ZOOM_DURATION_SECONDS = 3;
 const DEFAULT_ZOOM_SCALE = 1.5;
+const DEFAULT_OVERLAY_DURATION_SECONDS = 3;
+const DEFAULT_BLUR_RADIUS = 16;
 
 interface EditorState {
   tracks: TimelineClip[];
@@ -31,6 +34,12 @@ interface EditorState {
   zoomRegions: ZoomRegion[];
   /** True while the video canvas is in marquee-drawing mode for a new zoom region. */
   isDrawingZoom: boolean;
+  blurRegions: BlurRegion[];
+  isDrawingBlur: boolean;
+  /** Which blur region's move/resize handles are showing on canvas, if any. */
+  selectedBlurId: string | null;
+  textRegions: TextRegion[];
+  selectedTextId: string | null;
   history: { past: TimelineClip[][]; future: TimelineClip[][] };
 }
 
@@ -58,6 +67,16 @@ type Action =
   | { type: "ADD_ZOOM_REGION"; region: ZoomRegion }
   | { type: "UPDATE_ZOOM_REGION"; id: string; changes: Partial<ZoomRegion> }
   | { type: "REMOVE_ZOOM_REGION"; id: string }
+  | { type: "START_BLUR_DRAWING" }
+  | { type: "CANCEL_BLUR_DRAWING" }
+  | { type: "ADD_BLUR_REGION"; region: BlurRegion }
+  | { type: "UPDATE_BLUR_REGION"; id: string; changes: Partial<BlurRegion> }
+  | { type: "REMOVE_BLUR_REGION"; id: string }
+  | { type: "SELECT_BLUR_REGION"; id: string | null }
+  | { type: "ADD_TEXT_REGION"; region: TextRegion }
+  | { type: "UPDATE_TEXT_REGION"; id: string; changes: Partial<TextRegion> }
+  | { type: "REMOVE_TEXT_REGION"; id: string }
+  | { type: "SELECT_TEXT_REGION"; id: string | null }
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET_PROJECT" };
@@ -73,6 +92,11 @@ const INITIAL_STATE: EditorState = {
   canvasAspectRatio: "16:9",
   zoomRegions: [],
   isDrawingZoom: false,
+  blurRegions: [],
+  isDrawingBlur: false,
+  selectedBlurId: null,
+  textRegions: [],
+  selectedTextId: null,
   history: { past: [], future: [] },
 };
 
@@ -220,6 +244,50 @@ function editorReducer(state: EditorState, action: Action): EditorState {
     case "REMOVE_ZOOM_REGION":
       return { ...state, zoomRegions: state.zoomRegions.filter((region) => region.id !== action.id) };
 
+    case "START_BLUR_DRAWING":
+      return { ...state, isDrawingBlur: true };
+
+    case "CANCEL_BLUR_DRAWING":
+      return { ...state, isDrawingBlur: false };
+
+    case "ADD_BLUR_REGION":
+      return { ...state, blurRegions: [...state.blurRegions, action.region], isDrawingBlur: false, selectedBlurId: action.region.id };
+
+    case "UPDATE_BLUR_REGION":
+      return {
+        ...state,
+        blurRegions: state.blurRegions.map((region) => (region.id === action.id ? { ...region, ...action.changes } : region)),
+      };
+
+    case "REMOVE_BLUR_REGION":
+      return {
+        ...state,
+        blurRegions: state.blurRegions.filter((region) => region.id !== action.id),
+        selectedBlurId: state.selectedBlurId === action.id ? null : state.selectedBlurId,
+      };
+
+    case "SELECT_BLUR_REGION":
+      return { ...state, selectedBlurId: action.id };
+
+    case "ADD_TEXT_REGION":
+      return { ...state, textRegions: [...state.textRegions, action.region], selectedTextId: action.region.id };
+
+    case "UPDATE_TEXT_REGION":
+      return {
+        ...state,
+        textRegions: state.textRegions.map((region) => (region.id === action.id ? { ...region, ...action.changes } : region)),
+      };
+
+    case "REMOVE_TEXT_REGION":
+      return {
+        ...state,
+        textRegions: state.textRegions.filter((region) => region.id !== action.id),
+        selectedTextId: state.selectedTextId === action.id ? null : state.selectedTextId,
+      };
+
+    case "SELECT_TEXT_REGION":
+      return { ...state, selectedTextId: action.id };
+
     case "UNDO": {
       const previous = state.history.past.at(-1);
       if (!previous) return state;
@@ -264,6 +332,9 @@ interface EditorContextValue {
   canRedo: boolean;
   /** The zoom region (if any) covering the current playhead. */
   activeZoomRegion: ZoomRegion | null;
+  /** Blur/text regions covering the current playhead — several can be visible at once, unlike zoom. */
+  activeBlurRegions: BlurRegion[];
+  activeTextRegions: TextRegion[];
 
   addClip: (clip: TimelineClip) => void;
   removeClip: (id: string) => void;
@@ -288,6 +359,16 @@ interface EditorContextValue {
   addZoomRegion: (bounds: ZoomRegionBounds) => void;
   updateZoomRegion: (id: string, changes: Partial<ZoomRegion>) => void;
   removeZoomRegion: (id: string) => void;
+  startBlurDrawing: () => void;
+  cancelBlurDrawing: () => void;
+  addBlurRegion: (bounds: BoundingBox) => void;
+  updateBlurRegion: (id: string, changes: Partial<BlurRegion>) => void;
+  removeBlurRegion: (id: string) => void;
+  selectBlurRegion: (id: string | null) => void;
+  addTextRegion: (preset: { content: string; bounds: BoundingBox; style: TextRegion["style"] }) => void;
+  updateTextRegion: (id: string, changes: Partial<TextRegion>) => void;
+  removeTextRegion: (id: string) => void;
+  selectTextRegion: (id: string | null) => void;
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
@@ -352,6 +433,54 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     [],
   );
   const removeZoomRegion = useCallback((id: string) => dispatch({ type: "REMOVE_ZOOM_REGION", id }), []);
+  const startBlurDrawing = useCallback(() => dispatch({ type: "START_BLUR_DRAWING" }), []);
+  const cancelBlurDrawing = useCallback(() => dispatch({ type: "CANCEL_BLUR_DRAWING" }), []);
+  const addBlurRegion = useCallback(
+    (bounds: BoundingBox) => {
+      dispatch({
+        type: "ADD_BLUR_REGION",
+        region: {
+          id: crypto.randomUUID(),
+          name: `Blur ${state.blurRegions.length + 1}`,
+          startTime: state.currentTime,
+          endTime: state.currentTime + DEFAULT_OVERLAY_DURATION_SECONDS,
+          shape: "rectangle",
+          blurRadius: DEFAULT_BLUR_RADIUS,
+          feather: false,
+          bounds,
+        },
+      });
+    },
+    [state.currentTime, state.blurRegions.length],
+  );
+  const updateBlurRegion = useCallback(
+    (id: string, changes: Partial<BlurRegion>) => dispatch({ type: "UPDATE_BLUR_REGION", id, changes }),
+    [],
+  );
+  const removeBlurRegion = useCallback((id: string) => dispatch({ type: "REMOVE_BLUR_REGION", id }), []);
+  const selectBlurRegion = useCallback((id: string | null) => dispatch({ type: "SELECT_BLUR_REGION", id }), []);
+  const addTextRegion = useCallback(
+    (preset: { content: string; bounds: BoundingBox; style: TextRegion["style"] }) => {
+      dispatch({
+        type: "ADD_TEXT_REGION",
+        region: {
+          id: crypto.randomUUID(),
+          content: preset.content,
+          startTime: state.currentTime,
+          endTime: state.currentTime + DEFAULT_OVERLAY_DURATION_SECONDS,
+          bounds: preset.bounds,
+          style: preset.style,
+        },
+      });
+    },
+    [state.currentTime],
+  );
+  const updateTextRegion = useCallback(
+    (id: string, changes: Partial<TextRegion>) => dispatch({ type: "UPDATE_TEXT_REGION", id, changes }),
+    [],
+  );
+  const removeTextRegion = useCallback((id: string) => dispatch({ type: "REMOVE_TEXT_REGION", id }), []);
+  const selectTextRegion = useCallback((id: string | null) => dispatch({ type: "SELECT_TEXT_REGION", id }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
@@ -370,6 +499,14 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     () => state.zoomRegions.find((region) => state.currentTime >= region.startTime && state.currentTime < region.endTime) ?? null,
     [state.zoomRegions, state.currentTime],
   );
+  const activeBlurRegions = useMemo(
+    () => state.blurRegions.filter((region) => state.currentTime >= region.startTime && state.currentTime < region.endTime),
+    [state.blurRegions, state.currentTime],
+  );
+  const activeTextRegions = useMemo(
+    () => state.textRegions.filter((region) => state.currentTime >= region.startTime && state.currentTime < region.endTime),
+    [state.textRegions, state.currentTime],
+  );
 
   const value = useMemo<EditorContextValue>(
     () => ({
@@ -381,6 +518,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       canUndo: state.history.past.length > 0,
       canRedo: state.history.future.length > 0,
       activeZoomRegion,
+      activeBlurRegions,
+      activeTextRegions,
       addClip,
       removeClip,
       updateClip,
@@ -404,6 +543,16 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       addZoomRegion,
       updateZoomRegion,
       removeZoomRegion,
+      startBlurDrawing,
+      cancelBlurDrawing,
+      addBlurRegion,
+      updateBlurRegion,
+      removeBlurRegion,
+      selectBlurRegion,
+      addTextRegion,
+      updateTextRegion,
+      removeTextRegion,
+      selectTextRegion,
       undo,
       redo,
       resetProject,
@@ -415,6 +564,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       selectedClip,
       totalDuration,
       activeZoomRegion,
+      activeBlurRegions,
+      activeTextRegions,
       addClip,
       removeClip,
       updateClip,
@@ -438,6 +589,16 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       addZoomRegion,
       updateZoomRegion,
       removeZoomRegion,
+      startBlurDrawing,
+      cancelBlurDrawing,
+      addBlurRegion,
+      updateBlurRegion,
+      removeBlurRegion,
+      selectBlurRegion,
+      addTextRegion,
+      updateTextRegion,
+      removeTextRegion,
+      selectTextRegion,
       undo,
       redo,
       resetProject,
