@@ -22,12 +22,18 @@ import {
 import { useEditor } from "@/context/EditorContext";
 import { clipTimelineDuration, clipTimelineEnd, type TimelineClip } from "@/lib/editor/types";
 import { formatTimecode } from "@/lib/editor/media-utils";
+import { beginTimeRangeDrag } from "@/lib/editor/timeline-drag";
 import { cn } from "@/lib/utils";
 import type { ZoomRegion } from "@/types/zoom";
+
+import { BlurTimelineTrack } from "./timeline/BlurTimelineTrack";
+import { TextTimelineTrack } from "./timeline/TextTimelineTrack";
 
 const RULER_HEIGHT = 28;
 const VIDEO_LANE_HEIGHT = 64;
 const ZOOM_LANE_HEIGHT = 28;
+const BLUR_LANE_HEIGHT = 28;
+const TEXT_LANE_HEIGHT = 28;
 const AUDIO_LANE_HEIGHT = 52;
 const MIN_CLIP_SECONDS = 0.2;
 const MIN_ZOOM_SECONDS = 0.5;
@@ -72,7 +78,8 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
 
   const viewDurationSeconds = Math.max(totalDuration + TRAILING_PADDING_SECONDS, MIN_VIEW_SECONDS);
   const contentWidth = viewDurationSeconds * state.zoomLevel;
-  const contentHeight = RULER_HEIGHT + VIDEO_LANE_HEIGHT + ZOOM_LANE_HEIGHT + AUDIO_LANE_HEIGHT;
+  const contentHeight =
+    RULER_HEIGHT + VIDEO_LANE_HEIGHT + ZOOM_LANE_HEIGHT + BLUR_LANE_HEIGHT + TEXT_LANE_HEIGHT + AUDIO_LANE_HEIGHT;
 
   const tickInterval = useMemo(() => pickTickInterval(state.zoomLevel), [state.zoomLevel]);
   const ticks = useMemo(() => {
@@ -172,40 +179,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
   }
 
   function beginZoomDrag(event: React.PointerEvent, region: ZoomRegion, mode: DragMode) {
-    event.stopPropagation();
-    event.preventDefault();
-
-    const startClientX = event.clientX;
-    const original = region;
-    const duration = original.endTime - original.startTime;
-
-    function onMove(ev: PointerEvent) {
-      const deltaSeconds = (ev.clientX - startClientX) / state.zoomLevel;
-
-      if (mode === "move") {
-        const newStart = Math.max(0, original.startTime + deltaSeconds);
-        updateZoomRegion(region.id, { startTime: newStart, endTime: newStart + duration });
-        return;
-      }
-
-      if (mode === "trim-start") {
-        const newStart = Math.min(Math.max(0, original.startTime + deltaSeconds), original.endTime - MIN_ZOOM_SECONDS);
-        updateZoomRegion(region.id, { startTime: newStart });
-        return;
-      }
-
-      // trim-end
-      const newEnd = Math.max(original.endTime + deltaSeconds, original.startTime + MIN_ZOOM_SECONDS);
-      updateZoomRegion(region.id, { endTime: newEnd });
-    }
-
-    function onUp() {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    }
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    beginTimeRangeDrag(event, region, mode, state.zoomLevel, MIN_ZOOM_SECONDS, (changes) => updateZoomRegion(region.id, changes));
   }
 
   const playheadLeft = state.currentTime * state.zoomLevel;
@@ -294,6 +268,9 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
               />
             ))}
           </div>
+
+          <BlurTimelineTrack laneHeight={BLUR_LANE_HEIGHT} onLaneScrub={handleScrubPointerDown} />
+          <TextTimelineTrack laneHeight={TEXT_LANE_HEIGHT} onLaneScrub={handleScrubPointerDown} />
 
           {/* Audio lane — mirrors every clip's own extracted waveform, since
               our recordings/uploads carry embedded audio rather than a

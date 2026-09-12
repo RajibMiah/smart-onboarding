@@ -7,6 +7,9 @@ import { useEditor } from "@/context/EditorContext";
 import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
 import type { CanvasAspectRatio } from "@/lib/editor/types";
 
+import { BlurOverlay } from "./canvas/BlurOverlay";
+import { TextOverlay } from "./canvas/TextOverlay";
+
 const ASPECT_RATIO_CSS: Record<CanvasAspectRatio, string> = {
   "16:9": "16 / 9",
   "9:16": "9 / 16",
@@ -101,7 +104,7 @@ export function VideoCanvas({
   }
 
   return (
-    <section className="relative flex min-w-0 flex-1 items-center justify-center bg-neutral-900 p-6">
+    <section className="relative flex min-w-0 flex-1 items-center justify-center bg-neutral-900 px-[15px] py-6">
       {state.isDrawingZoom && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 border-2 border-black bg-brand-yellow px-3 py-1.5 text-xs font-semibold text-black shadow-popover">
           Draw a rectangle to set the zoom area
@@ -145,6 +148,13 @@ export function VideoCanvas({
               />
             )}
           </div>
+        )}
+
+        {hasMedia && (
+          <>
+            <BlurOverlay containerRef={canvasBoxRef} />
+            <TextOverlay containerRef={canvasBoxRef} />
+          </>
         )}
       </div>
 
