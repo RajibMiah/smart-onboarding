@@ -2,6 +2,49 @@
 
 AI-powered onboarding video tutorial & documentation platform.
 
+## Screenshots
+
+One screenshot per page — see the [Pages](#pages) section below for how each
+maps to a route in the code.
+
+### Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Library — Clips
+![Library — Clips](docs/screenshots/library-clips.png)
+
+### Library — Pages
+![Library — Pages](docs/screenshots/library-pages.png)
+
+### Video Studio
+![Video Studio](docs/screenshots/studio.png)
+
+### Account Settings
+![Account Settings](docs/screenshots/settings-account.png)
+
+### Health Check
+![Health Check](docs/screenshots/health.png)
+
+<details>
+<summary>Placeholder pages (empty state only, no feature built yet)</summary>
+
+### Analytics
+![Analytics](docs/screenshots/analytics-dashboard.png)
+
+### Library — Playlists
+![Library — Playlists](docs/screenshots/library-playlists.png)
+
+### Projects
+![Projects](docs/screenshots/projects.png)
+
+### Requests
+![Requests](docs/screenshots/requests.png)
+
+### Shared with me
+![Shared with me](docs/screenshots/shared.png)
+
+</details>
+
 ## Architecture
 
 - **Frontend:** Next.js (App Router, TypeScript, Tailwind CSS) — `/frontend`
@@ -66,20 +109,10 @@ app/
                                      → docs/screenshots/health.png
 ```
 
-- [Dashboard](docs/screenshots/dashboard.png)
-- [Analytics (placeholder)](docs/screenshots/analytics-dashboard.png)
-- [Library — Clips](docs/screenshots/library-clips.png)
-- [Library — Pages](docs/screenshots/library-pages.png)
-- [Library — Playlists (placeholder)](docs/screenshots/library-playlists.png)
-- [Projects (placeholder)](docs/screenshots/projects.png)
-- [Requests (placeholder)](docs/screenshots/requests.png)
-- [Shared with me (placeholder)](docs/screenshots/shared.png)
-- [Account Settings](docs/screenshots/settings-account.png)
-- [Video Studio](docs/screenshots/studio.png)
-- [Health Check](docs/screenshots/health.png)
-
-"Placeholder" pages render a real empty state but have no feature behind them
-yet — they're wired into navigation ahead of being built out.
+Screenshots for every route above are in the [Screenshots](#screenshots)
+section at the top of this file. "Placeholder" pages render a real empty
+state but have no feature behind them yet — they're wired into navigation
+ahead of being built out.
 
 ## Prerequisites
 
