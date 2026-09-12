@@ -1,46 +1,97 @@
 "use client";
 
-import { useState } from "react";
+import { Search, Trash2, ZoomIn } from "lucide-react";
 
+import { useEditor } from "@/context/EditorContext";
+import { formatTimecode } from "@/lib/editor/media-utils";
 import { cn } from "@/lib/utils";
 
 interface ZoomPanelProps {
   onNotify: (message: string) => void;
 }
 
-const PRESETS = [1.25, 1.5, 2.0];
+const MIN_SCALE = 1;
+const MAX_SCALE = 3;
 
+/**
+ * "Create Zoom" hands off to `VideoCanvas`'s marquee-drawing mode (shared
+ * `isDrawingZoom` state) — the region itself is only created there, once the
+ * user actually drags a box, so this panel just lists what already exists.
+ */
 export function ZoomPanel({ onNotify }: ZoomPanelProps) {
-  const [selected, setSelected] = useState(PRESETS[0]);
+  const { videoClips, state, startZoomDrawing, cancelZoomDrawing, updateZoomRegion, removeZoomRegion } = useEditor();
+  const hasMedia = videoClips.length > 0;
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <p className="text-xs text-neutral-500">Zoom in on the mouse cursor at the current playhead position.</p>
-
-      <div className="grid grid-cols-3 gap-2">
-        {PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => setSelected(preset)}
-            aria-pressed={selected === preset}
-            className={cn(
-              "border-2 py-3 text-sm font-bold transition",
-              selected === preset ? "border-black bg-brand-yellow text-black" : "border-black/20 text-neutral-600 hover:border-black",
-            )}
-          >
-            {preset.toFixed(2)}x
-          </button>
-        ))}
-      </div>
+      <p className="text-xs text-neutral-500">
+        Draw a zoom region on the canvas — it animates in and back out as the playhead crosses it.
+      </p>
 
       <button
         type="button"
-        onClick={() => onNotify(`Adding a ${selected.toFixed(2)}x zoom keyframe isn't available in this offline preview yet.`)}
-        className="border-2 border-black bg-brand-yellow py-2 text-sm font-semibold text-black transition hover:bg-yellow-500"
+        disabled={!hasMedia}
+        onClick={() => (state.isDrawingZoom ? cancelZoomDrawing() : startZoomDrawing())}
+        className={cn(
+          "flex items-center justify-center gap-2 border-2 border-black py-2.5 text-sm font-semibold transition",
+          !hasMedia
+            ? "cursor-not-allowed border-black/20 bg-neutral-100 text-neutral-400"
+            : state.isDrawingZoom
+              ? "bg-black text-white"
+              : "bg-brand-yellow text-black hover:bg-yellow-500",
+        )}
       >
-        + Add zoom keyframe
+        <Search className="h-4 w-4" />
+        {state.isDrawingZoom ? "Drawing… (drag on canvas)" : "Create Zoom"}
       </button>
+
+      {state.zoomRegions.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Active zoom effects ({state.zoomRegions.length})
+          </p>
+          <div className="flex flex-col gap-2">
+            {state.zoomRegions.map((region) => (
+              <div key={region.id} className="flex flex-col gap-2.5 border-2 border-black p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-black">
+                    <ZoomIn className="h-3.5 w-3.5" /> {region.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeZoomRegion(region.id)}
+                    aria-label={`Delete ${region.name}`}
+                    className="p-1 text-neutral-400 transition hover:text-red-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Scale</span>
+                    <span className="font-mono text-xs font-bold text-black">{region.scale.toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={MIN_SCALE}
+                    max={MAX_SCALE}
+                    step={0.1}
+                    value={region.scale}
+                    onChange={(event) => updateZoomRegion(region.id, { scale: Number(event.target.value) })}
+                    className="w-full accent-black"
+                    aria-label={`${region.name} scale`}
+                  />
+                </div>
+
+                <p className="font-mono text-[11px] text-neutral-500">
+                  From {formatTimecode(region.startTime)} - {formatTimecode(region.endTime)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

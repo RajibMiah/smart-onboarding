@@ -16,17 +16,21 @@ import {
   Undo2,
   Volume2,
   VolumeX,
+  ZoomIn,
 } from "lucide-react";
 
 import { useEditor } from "@/context/EditorContext";
 import { clipTimelineDuration, clipTimelineEnd, type TimelineClip } from "@/lib/editor/types";
 import { formatTimecode } from "@/lib/editor/media-utils";
 import { cn } from "@/lib/utils";
+import type { ZoomRegion } from "@/types/zoom";
 
 const RULER_HEIGHT = 28;
 const VIDEO_LANE_HEIGHT = 64;
+const ZOOM_LANE_HEIGHT = 28;
 const AUDIO_LANE_HEIGHT = 52;
 const MIN_CLIP_SECONDS = 0.2;
+const MIN_ZOOM_SECONDS = 0.5;
 const MIN_VIEW_SECONDS = 30;
 const TRAILING_PADDING_SECONDS = 8;
 const SNAP_PIXEL_THRESHOLD = 8;
@@ -56,6 +60,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
     togglePlay,
     setZoom,
     toggleSnapping,
+    updateZoomRegion,
     undo,
     redo,
   } = useEditor();
@@ -67,7 +72,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
 
   const viewDurationSeconds = Math.max(totalDuration + TRAILING_PADDING_SECONDS, MIN_VIEW_SECONDS);
   const contentWidth = viewDurationSeconds * state.zoomLevel;
-  const contentHeight = RULER_HEIGHT + VIDEO_LANE_HEIGHT + AUDIO_LANE_HEIGHT;
+  const contentHeight = RULER_HEIGHT + VIDEO_LANE_HEIGHT + ZOOM_LANE_HEIGHT + AUDIO_LANE_HEIGHT;
 
   const tickInterval = useMemo(() => pickTickInterval(state.zoomLevel), [state.zoomLevel]);
   const ticks = useMemo(() => {
@@ -166,6 +171,43 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
     window.addEventListener("pointerup", onUp);
   }
 
+  function beginZoomDrag(event: React.PointerEvent, region: ZoomRegion, mode: DragMode) {
+    event.stopPropagation();
+    event.preventDefault();
+
+    const startClientX = event.clientX;
+    const original = region;
+    const duration = original.endTime - original.startTime;
+
+    function onMove(ev: PointerEvent) {
+      const deltaSeconds = (ev.clientX - startClientX) / state.zoomLevel;
+
+      if (mode === "move") {
+        const newStart = Math.max(0, original.startTime + deltaSeconds);
+        updateZoomRegion(region.id, { startTime: newStart, endTime: newStart + duration });
+        return;
+      }
+
+      if (mode === "trim-start") {
+        const newStart = Math.min(Math.max(0, original.startTime + deltaSeconds), original.endTime - MIN_ZOOM_SECONDS);
+        updateZoomRegion(region.id, { startTime: newStart });
+        return;
+      }
+
+      // trim-end
+      const newEnd = Math.max(original.endTime + deltaSeconds, original.startTime + MIN_ZOOM_SECONDS);
+      updateZoomRegion(region.id, { endTime: newEnd });
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   const playheadLeft = state.currentTime * state.zoomLevel;
 
   return (
@@ -232,6 +274,23 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
                 selected={selectedClip?.id === clip.id}
                 onSelect={() => selectClip(clip.id)}
                 onDragStart={beginClipDrag}
+              />
+            ))}
+          </div>
+
+          {/* Zoom lane */}
+          <div
+            onPointerDown={handleScrubPointerDown}
+            className="relative border-b border-black/15 bg-white"
+            style={{ height: ZOOM_LANE_HEIGHT }}
+          >
+            {state.zoomRegions.map((region) => (
+              <ZoomRegionBlock
+                key={region.id}
+                region={region}
+                zoomLevel={state.zoomLevel}
+                laneHeight={ZOOM_LANE_HEIGHT}
+                onDragStart={beginZoomDrag}
               />
             ))}
           </div>
@@ -442,6 +501,41 @@ function VideoClipBlock({ clip, zoomLevel, laneHeight, selected, onSelect, onDra
       <div
         onPointerDown={(event) => onDragStart(event, clip, "trim-end")}
         className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-white/0 hover:bg-white/30"
+      />
+    </div>
+  );
+}
+
+function ZoomRegionBlock({
+  region,
+  zoomLevel,
+  laneHeight,
+  onDragStart,
+}: {
+  region: ZoomRegion;
+  zoomLevel: number;
+  laneHeight: number;
+  onDragStart: (event: React.PointerEvent, region: ZoomRegion, mode: DragMode) => void;
+}) {
+  const left = region.startTime * zoomLevel;
+  const width = Math.max(4, (region.endTime - region.startTime) * zoomLevel);
+
+  return (
+    <div
+      onPointerDown={(event) => onDragStart(event, region, "move")}
+      className="absolute top-1 flex cursor-grab items-center gap-1 overflow-hidden border-2 border-black bg-brand-yellow px-1.5 active:cursor-grabbing"
+      style={{ left, width, height: laneHeight - 8 }}
+    >
+      <ZoomIn className="h-3 w-3 shrink-0 text-black" />
+      <span className="truncate text-[10px] font-bold text-black">{region.scale.toFixed(1)}x Zoom</span>
+
+      <div
+        onPointerDown={(event) => onDragStart(event, region, "trim-start")}
+        className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/0 hover:bg-black/20"
+      />
+      <div
+        onPointerDown={(event) => onDragStart(event, region, "trim-end")}
+        className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/0 hover:bg-black/20"
       />
     </div>
   );
