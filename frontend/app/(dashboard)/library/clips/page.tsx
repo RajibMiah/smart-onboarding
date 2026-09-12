@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Video } from "lucide-react";
 
@@ -10,8 +10,14 @@ import { EditorialFilterBar, type FilterChip } from "@/components/ui/EditorialFi
 import { Toast } from "@/components/ui/Toast";
 import { useLibraryFilter } from "@/hooks/useLibraryFilter";
 import { useToast } from "@/hooks/useToast";
-import { MOCK_CLIPS } from "@/lib/library-mock-data";
-import { DEFAULT_SORT_OPTIONS, type ClipItem, type LibrarySortOption, type LibraryStatusFilter } from "@/types/library";
+import {
+  duplicateClipInStore,
+  getClipsSnapshot,
+  removeClipFromStore,
+  renameClipInStore,
+  subscribeToClips,
+} from "@/lib/library-mock-data";
+import { DEFAULT_SORT_OPTIONS, type LibrarySortOption, type LibraryStatusFilter } from "@/types/library";
 
 const STATUS_CHIPS: FilterChip[] = [
   { value: "all", label: "All results" },
@@ -22,7 +28,7 @@ const STATUS_CHIPS: FilterChip[] = [
 export default function ClipsLibraryPage() {
   const router = useRouter();
   const toast = useToast();
-  const [clips, setClips] = useState<ClipItem[]>(MOCK_CLIPS);
+  const clips = useSyncExternalStore(subscribeToClips, getClipsSnapshot, getClipsSnapshot);
   const [view, setView] = useState<"cards" | "table">("cards");
 
   const filter = useLibraryFilter({
@@ -33,33 +39,13 @@ export default function ClipsLibraryPage() {
     getUpdatedAt: (clip) => clip.updatedAt,
   });
 
-  const removeClip = useCallback((id: string) => {
-    setClips((prev) => prev.filter((clip) => clip.id !== id));
-  }, []);
-
-  const duplicateClip = useCallback((id: string) => {
-    setClips((prev) => {
-      const source = prev.find((clip) => clip.id === id);
-      if (!source) return prev;
-      const copy: ClipItem = {
-        ...source,
-        id: crypto.randomUUID(),
-        title: `${source.title} (copy)`,
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        views: 0,
-        likes: 0,
-        comments: 0,
-      };
-      return [copy, ...prev];
-    });
-  }, []);
+  const removeClip = useCallback((id: string) => removeClipFromStore(id), []);
+  const duplicateClip = useCallback((id: string) => duplicateClipInStore(id), []);
 
   const renameClip = useCallback((id: string, currentTitle: string) => {
     const next = window.prompt("Rename clip", currentTitle)?.trim();
     if (!next) return;
-    setClips((prev) => prev.map((clip) => (clip.id === id ? { ...clip, title: next, updatedAt: new Date().toISOString() } : clip)));
+    renameClipInStore(id, next);
   }, []);
 
   const hasAnyClips = clips.length > 0;

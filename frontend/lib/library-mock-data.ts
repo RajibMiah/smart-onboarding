@@ -73,6 +73,62 @@ export const MOCK_CLIPS: ClipItem[] = [
   },
 ];
 
+/**
+ * Plain external store for clips (same pattern as the sidebar flag in
+ * `context/ui-context.tsx`), not React state — the Studio's Review page and
+ * the dashboard's Library page are two separate route subtrees with no
+ * common ancestor, so a clip saved from Review needs a store neither one
+ * owns to actually show up in the other without a page reload.
+ */
+let clipsStore: ClipItem[] = [...MOCK_CLIPS];
+const clipsListeners = new Set<() => void>();
+
+function notifyClipsListeners(): void {
+  clipsListeners.forEach((listener) => listener());
+}
+
+export function subscribeToClips(listener: () => void): () => void {
+  clipsListeners.add(listener);
+  return () => clipsListeners.delete(listener);
+}
+
+export function getClipsSnapshot(): ClipItem[] {
+  return clipsStore;
+}
+
+export function addClip(clip: ClipItem): void {
+  clipsStore = [clip, ...clipsStore];
+  notifyClipsListeners();
+}
+
+export function removeClipFromStore(id: string): void {
+  clipsStore = clipsStore.filter((clip) => clip.id !== id);
+  notifyClipsListeners();
+}
+
+export function duplicateClipInStore(id: string): void {
+  const source = clipsStore.find((clip) => clip.id === id);
+  if (!source) return;
+  const copy: ClipItem = {
+    ...source,
+    id: crypto.randomUUID(),
+    title: `${source.title} (copy)`,
+    status: "draft",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    views: 0,
+    likes: 0,
+    comments: 0,
+  };
+  clipsStore = [copy, ...clipsStore];
+  notifyClipsListeners();
+}
+
+export function renameClipInStore(id: string, title: string): void {
+  clipsStore = clipsStore.map((clip) => (clip.id === id ? { ...clip, title, updatedAt: new Date().toISOString() } : clip));
+  notifyClipsListeners();
+}
+
 export const MOCK_PAGES: PageItem[] = [
   {
     id: "page-1",

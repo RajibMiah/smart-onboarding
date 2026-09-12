@@ -50,7 +50,7 @@ export function ClipListItem({ clip, onRename, onMoveToProject, onDuplicate, onD
         }
       />
 
-      <EditorialCard.Footer label="▲ Edit This Clip" counter={clip.views} />
+      <EditorialCard.Footer label="▲ Edit This Clip" counter={clip.views} href={`/studio?clip=${clip.id}`} />
     </EditorialCard>
   );
 }

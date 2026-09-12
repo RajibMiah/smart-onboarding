@@ -1,4 +1,5 @@
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
+import Link from "next/link";
 import { ImageOff } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -127,9 +128,9 @@ function Footer({ label, counter, onClick, href, className }: FooterProps) {
 
   if (href) {
     return (
-      <a href={href} className={sharedClassName}>
+      <Link href={href} className={sharedClassName}>
         {content}
-      </a>
+      </Link>
     );
   }
 
