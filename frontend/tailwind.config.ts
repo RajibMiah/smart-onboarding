@@ -3,7 +3,7 @@ import type { Config } from "tailwindcss";
 /**
  * Tailwind v4 is CSS-first (see `@theme` in app/globals.css); this file is kept
  * alongside it — and loaded via `@config` — purely to extend the theme with
- * the AI Paper Click (APC) brand palette in one typed, IDE-discoverable place.
+ * the AI Paper Clip (APC) brand palette in one typed, IDE-discoverable place.
  *
  * Editorial redesign (2026): `apc-*` is repointed from the old soft navy
  * scale to a black-based scale — every existing `bg-apc-900` / `text-apc-900`

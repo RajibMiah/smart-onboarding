@@ -67,7 +67,7 @@ function Logo() {
       <span className="flex h-7 w-7 items-center justify-center border-2 border-black bg-black text-xs font-bold text-white">
         APC
       </span>
-      <span className="hidden text-lg font-black tracking-tight sm:inline">AI Paper Click</span>
+      <span className="hidden text-lg font-black tracking-tight sm:inline">AI Paper Clip</span>
     </Link>
   );
 }
