@@ -15,6 +15,9 @@ frontend/out/
 frontend/.env.local
 frontend/next-env.d.ts
 
+# Docker Compose (root-level; contains credentials, see .env.example)
+/.env
+
 # General
 .DS_Store
 *.log
