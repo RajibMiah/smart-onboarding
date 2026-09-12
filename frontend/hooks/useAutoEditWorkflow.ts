@@ -18,7 +18,6 @@ export interface AutoEditConfig {
     tone: string;
     speed: number;
   };
-  autoPublish: boolean;
 }
 
 const DEFAULT_CONFIG: AutoEditConfig = {
@@ -34,7 +33,6 @@ const DEFAULT_CONFIG: AutoEditConfig = {
     tone: "Casual address",
     speed: 1,
   },
-  autoPublish: false,
 };
 
 const APPLY_DURATION_MS = 1200;
@@ -78,10 +76,6 @@ export function useAutoEditWorkflow(initialConfig: AutoEditConfig = DEFAULT_CONF
     setConfig((prev) => ({ ...prev, silenceSpeedMultiplier }));
   }, []);
 
-  const setAutoPublish = useCallback((autoPublish: boolean) => {
-    setConfig((prev) => ({ ...prev, autoPublish }));
-  }, []);
-
   const applyWorkflow = useCallback((onNotify: (message: string) => void) => {
     setIsProcessing(true);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -100,7 +94,6 @@ export function useAutoEditWorkflow(initialConfig: AutoEditConfig = DEFAULT_CONF
     setShortenSilences,
     setSilenceStrategy,
     setSilenceSpeedMultiplier,
-    setAutoPublish,
     applyWorkflow,
   };
 }
