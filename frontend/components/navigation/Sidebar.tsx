@@ -80,7 +80,7 @@ const NAV_ITEMS: NavItem[] = [
     subItems: [
       { label: "My Account", href: "/settings/account" },
       { label: "Manage Users", href: "/admin/users" },
-      { label: "Workspace" },
+      { label: "Workspace", href: "/settings/workspace" },
     ],
   },
 ];

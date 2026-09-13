@@ -106,6 +106,11 @@ export type ApiSystemRoleTier =
   | "viewer"
   | "custom";
 
+export interface ApiRoleRef {
+  id: string;
+  name: string;
+}
+
 export interface ApiWorkspaceMembership {
   is_authorized: boolean;
   is_creator: boolean;
@@ -113,9 +118,19 @@ export interface ApiWorkspaceMembership {
   is_content_manager: boolean;
   tags: string[];
   role_tier: ApiSystemRoleTier;
+  role_display: string;
+  role_description: string;
   custom_role: string | null;
   custom_role_name: string | null;
+  department: ApiRoleRef | null;
+  team: ApiRoleRef | null;
   revoked_at: string | null;
+}
+
+export interface ApiUserWorkspace {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 export interface ApiUser {
@@ -128,9 +143,17 @@ export interface ApiUser {
   location: string;
   language: string;
   organization: string | null;
+  workspace: ApiUserWorkspace | null;
   is_active: boolean;
   membership: ApiWorkspaceMembership | null;
   created_at: string;
+}
+
+export interface ApiWorkspaceSettings {
+  retention_days: number | null;
+  default_clip_visibility: "draft" | "published";
+  force_strict_theme: boolean;
+  accent_color: string;
 }
 
 export interface ApiOrganization {
@@ -140,9 +163,32 @@ export interface ApiOrganization {
   domain: string;
   logo_url: string;
   tier: string;
+  owner: string | null;
+  owner_email: string | null;
+  settings: ApiWorkspaceSettings;
   created_at: string;
   updated_at: string;
 }
+
+export interface WorkspaceUpdatePayload {
+  name?: string;
+  domain?: string;
+  logo_url?: string;
+  settings?: Partial<ApiWorkspaceSettings>;
+}
+
+export const organizationsApi = {
+  current: () => request<Paginated<ApiOrganization>>("/organizations/").then((page) => page.results[0] ?? null),
+  update: (id: string, payload: WorkspaceUpdatePayload) =>
+    request<ApiOrganization>(`/organizations/${id}/`, { method: "PATCH", body: payload }),
+  transferOwnership: (id: string, newOwnerId: string) =>
+    request<ApiOrganization>(`/organizations/${id}/transfer-ownership/`, {
+      method: "POST",
+      body: { new_owner_id: newOwnerId },
+    }),
+  remove: (id: string, confirmName: string) =>
+    request<void>(`/organizations/${id}/`, { method: "DELETE", body: { confirm_name: confirmName } }),
+};
 
 export interface ApiTeam {
   id: string;
@@ -267,10 +313,17 @@ export const authApi = {
   register: (payload: RegisterPayload) => request<ApiUser>("/auth/register/", { method: "POST", body: payload }),
   login: (payload: { email: string; password: string }) =>
     request<{ detail: string }>("/auth/login/", { method: "POST", body: payload }),
-  logout: () => request<{ detail: string }>("/auth/logout/", { method: "POST" }),
+  logout: (options?: { allDevices?: boolean }) =>
+    request<{ detail: string }>("/auth/logout/", { method: "POST", body: { all_devices: Boolean(options?.allDevices) } }),
   me: () => request<ApiUser>("/auth/me/"),
-  updateMe: (payload: Partial<Pick<ApiUser, "first_name" | "last_name" | "avatar_url" | "location" | "language">>) =>
-    request<ApiUser>("/auth/me/", { method: "PATCH", body: payload }),
+  updateMe: (
+    payload: Partial<Pick<ApiUser, "first_name" | "last_name" | "location" | "language">> & { team_id?: string | null },
+  ) => request<ApiUser>("/auth/me/", { method: "PATCH", body: payload }),
+  uploadAvatar: (file: Blob) => {
+    const form = new FormData();
+    form.set("avatar", file, "avatar.jpg");
+    return request<ApiUser>("/auth/me/avatar/", { method: "POST", body: form });
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -635,10 +688,14 @@ export const playlistItemsApi = {
 
 export const teamsApi = {
   list: () => request<Paginated<ApiTeam>>("/teams/"),
+  create: (payload: { name: string; department?: string | null }) =>
+    request<ApiTeam>("/teams/", { method: "POST", body: payload }),
 };
 
 export const departmentsApi = {
   list: () => request<Paginated<ApiDepartment>>("/departments/"),
+  create: (payload: { name: string; description?: string }) =>
+    request<ApiDepartment>("/departments/", { method: "POST", body: payload }),
 };
 
 // ---------------------------------------------------------------------------

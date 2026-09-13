@@ -4,6 +4,8 @@ from django.db import connection
 from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -15,6 +17,7 @@ from .models import CustomRole, Department, Organization, SystemRoleTier, Team, 
 from .permissions import HasRolePermission, IsWorkspaceMember
 from .serializers import (
     AcceptInvitationSerializer,
+    AvatarUploadSerializer,
     CustomRoleSerializer,
     CustomTokenObtainPairSerializer,
     DepartmentSerializer,
@@ -139,12 +142,19 @@ class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
-        if refresh_token:
-            try:
-                RefreshToken(refresh_token).blacklist()
-            except TokenError:
-                pass
+        if request.data.get("all_devices"):
+            # Every refresh token ever issued to this user, not just the
+            # current session's — same blacklist-every-OutstandingToken
+            # approach as OrgUserViewSet.revoke.
+            for outstanding in OutstandingToken.objects.filter(user=request.user):
+                BlacklistedToken.objects.get_or_create(token=outstanding)
+        else:
+            refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
+            if refresh_token:
+                try:
+                    RefreshToken(refresh_token).blacklist()
+                except TokenError:
+                    pass
 
         response = Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
         _clear_auth_cookies(response)
@@ -160,14 +170,89 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
-class OrganizationViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only: an organization is provisioned at registration, not edited here."""
+class MeAvatarUploadView(generics.GenericAPIView):
+    """POST /auth/me/avatar/ — multipart image upload, kept off MeView's own
+    PATCH (JSON) so that endpoint doesn't need multipart parsing for every
+    plain profile-field update."""
+
+    serializer_class = AvatarUploadSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        if user.avatar:
+            user.avatar.delete(save=False)
+        user.avatar = serializer.validated_data["avatar"]
+        user.save(update_fields=["avatar"])
+
+        return Response(UserSerializer(user, context={"request": request}).data)
+
+
+class OrganizationViewSet(viewsets.ModelViewSet):
+    """An organization is provisioned at registration; only Owner/Global
+    Admin/HR Manager may edit it afterward (workspace branding/retention
+    settings) — everyone else in the workspace can still read it."""
 
     serializer_class = OrganizationSerializer
     permission_classes = [IsWorkspaceMember]
+    http_method_names = ["get", "patch", "delete", "post", "head", "options"]
 
     def get_queryset(self):
         return Organization.objects.filter(id=self.request.user.organization_id)
+
+    def perform_update(self, serializer):
+        membership = getattr(self.request.user, "membership", None)
+        can_manage = bool(
+            membership and (membership.is_global_admin or membership.role_tier == SystemRoleTier.HR_MANAGER)
+        )
+        if not can_manage:
+            raise PermissionDenied("Only a Global Administrator or HR Manager can update workspace settings.")
+        serializer.save()
+
+    @action(detail=True, methods=["post"], url_path="transfer-ownership")
+    def transfer_ownership(self, request, pk=None):
+        """Owner-only: hands the Organization.owner FK to another member of
+        the same workspace, demoting the current owner to Global Admin
+        (never leaving the workspace ownerless) and promoting the target."""
+        organization = self.get_object()
+        actor_membership = getattr(request.user, "membership", None)
+        if not (actor_membership and organization.owner_id == request.user.id):
+            raise PermissionDenied("Only the current workspace owner can transfer ownership.")
+
+        new_owner_id = request.data.get("new_owner_id")
+        new_owner = User.objects.filter(id=new_owner_id, organization_id=organization.id).first()
+        if new_owner is None:
+            return Response({"detail": "That user isn't a member of this workspace."}, status=status.HTTP_400_BAD_REQUEST)
+        new_owner_membership = getattr(new_owner, "membership", None)
+        if new_owner_membership is None:
+            return Response({"detail": "That user has no workspace membership."}, status=status.HTTP_400_BAD_REQUEST)
+
+        organization.owner = new_owner
+        organization.save(update_fields=["owner"])
+
+        actor_membership.role_tier = SystemRoleTier.GLOBAL_ADMIN
+        actor_membership.save(update_fields=["role_tier", "updated_at"])
+        new_owner_membership.role_tier = SystemRoleTier.OWNER
+        new_owner_membership.is_global_admin = True
+        new_owner_membership.save(update_fields=["role_tier", "is_global_admin", "updated_at"])
+
+        return Response(OrganizationSerializer(organization, context={"request": request}).data)
+
+    def perform_destroy(self, instance):
+        # Owner-only, deliberately stricter than perform_update's Global
+        # Admin/HR Manager gate — deleting the entire tenant (every clip,
+        # playlist, user) is categorically more severe than editing settings.
+        membership = getattr(self.request.user, "membership", None)
+        if not (membership and instance.owner_id == self.request.user.id):
+            raise PermissionDenied("Only the workspace owner can delete the workspace.")
+        confirmed_name = self.request.data.get("confirm_name", "")
+        if confirmed_name != instance.name:
+            raise PermissionDenied("Workspace name confirmation did not match.")
+        instance.delete()
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):

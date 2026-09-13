@@ -25,6 +25,15 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+def default_workspace_settings() -> dict:
+    return {
+        "retention_days": None,  # None = keep indefinitely
+        "default_clip_visibility": "draft",
+        "force_strict_theme": True,
+        "accent_color": "#FFD200",
+    }
+
+
 class Organization(TimeStampedModel):
     """A workspace / tenant. Users, clips, playlists and pages are scoped to one."""
 
@@ -46,6 +55,10 @@ class Organization(TimeStampedModel):
         blank=True,
         related_name="owned_organizations",
     )
+    # Branding/retention/default-visibility preferences — grouped as one JSON
+    # blob (same pattern as Clip.filter_settings) rather than several columns
+    # for what's fundamentally one cohesive "workspace preferences" concept.
+    settings = models.JSONField(default=default_workspace_settings, blank=True)
 
     class Meta:
         db_table = "apc_organizations"
@@ -95,6 +108,9 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=80, blank=True)
     last_name = models.CharField(max_length=80, blank=True)
+    # `avatar` (an uploaded file) takes priority over `avatar_url` (an
+    # external URL) — same fallback pattern as Clip.thumbnail/thumbnail_url.
+    avatar = models.ImageField(upload_to="avatars/%Y/%m/%d/", blank=True, null=True)
     avatar_url = models.URLField(blank=True)
     location = models.CharField(max_length=150, blank=True)
     language = models.CharField(max_length=10, default="en-US")
@@ -146,6 +162,21 @@ class SystemRoleTier(models.TextChoices):
 HR_MANAGER_CAPABILITIES = frozenset(
     {"can_invite_users", "can_manage_teams", "can_manage_departments", "can_view_analytics", "can_revoke_access"}
 )
+
+# One human-readable scope sentence per tier, for the "My Account" role
+# banner ("[Role Name] - [scope]"). Kept here (not hardcoded in the
+# frontend) so it stays in sync with whatever HR_MANAGER_CAPABILITIES etc.
+# actually grant.
+ROLE_SCOPE_DESCRIPTIONS: dict[str, str] = {
+    SystemRoleTier.OWNER: "you have full control over the workspace, billing, and content",
+    SystemRoleTier.GLOBAL_ADMIN: "you can manage every user, role, and setting in this workspace",
+    SystemRoleTier.HR_MANAGER: "you can invite users, manage the workforce, and view audit logs",
+    SystemRoleTier.PROJECT_MANAGER: "you can curate content and manage teams in your department",
+    SystemRoleTier.TEAM_LEAD: "you can review clips and manage invites for your team",
+    SystemRoleTier.CREATOR: "you can create, see, and share content",
+    SystemRoleTier.VIEWER: "you have read-only access to shared content",
+    SystemRoleTier.CUSTOM: "your access is defined by a custom role",
+}
 
 
 class CustomRole(TimeStampedModel):

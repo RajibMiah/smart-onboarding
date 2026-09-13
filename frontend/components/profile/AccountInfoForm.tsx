@@ -2,22 +2,16 @@
 
 import { CheckCircle2 } from "lucide-react";
 
-import type { ProfileFormValues } from "@/hooks/useProfileForm";
+import type { ProfileFormValues } from "@/hooks/useUserProfile";
+import type { ApiTeam } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
-
-const LOCATION_OPTIONS: SelectOption[] = [{ value: "my-location", label: "My Location" }];
-const DEPARTMENT_OPTIONS: SelectOption[] = [{ value: "my-department", label: "My Department" }];
-const TEAM_OPTIONS: SelectOption[] = [{ value: "my-team", label: "My Team" }];
 
 interface AccountInfoFormProps {
   email: string;
   organisation: string;
-  role: string;
+  roleDescription: string;
+  departmentName: string | null;
+  teams: ApiTeam[];
   values: ProfileFormValues;
   setField: <K extends keyof ProfileFormValues>(key: K, value: ProfileFormValues[K]) => void;
   isDirty: boolean;
@@ -30,7 +24,9 @@ interface AccountInfoFormProps {
 export const AccountInfoForm = ({
   email,
   organisation,
-  role,
+  roleDescription,
+  departmentName,
+  teams,
   values,
   setField,
   isDirty,
@@ -47,67 +43,45 @@ export const AccountInfoForm = ({
       </div>
 
       <div>
-        <p className="mb-4 text-sm font-semibold text-apc-900">{role}</p>
+        <p className="mb-4 text-sm font-bold text-black">{roleDescription}</p>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <TextField
-            label="First Name"
-            required
-            value={values.firstName}
-            onChange={(value) => setField("firstName", value)}
-          />
-          <TextField
-            label="Last Name"
-            required
-            value={values.lastName}
-            onChange={(value) => setField("lastName", value)}
-          />
+          <TextField label="First Name" required value={values.firstName} onChange={(value) => setField("firstName", value)} />
+          <TextField label="Last Name" required value={values.lastName} onChange={(value) => setField("lastName", value)} />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <SelectField
+          <TextField
             label="Location"
             required
             value={values.location}
-            options={LOCATION_OPTIONS}
             onChange={(value) => setField("location", value)}
+            placeholder="e.g. Berlin, Germany"
           />
-          <SelectField
-            label="Department"
-            required
-            value={values.department}
-            options={DEPARTMENT_OPTIONS}
-            onChange={(value) => setField("department", value)}
-          />
-          <SelectField
-            label="Team"
-            required
-            value={values.team}
-            options={TEAM_OPTIONS}
-            onChange={(value) => setField("team", value)}
+          <ReadOnlyField label="Department" value={departmentName ?? "Not assigned"} valid={Boolean(departmentName)} />
+          <TeamSelectField
+            value={values.teamId}
+            teams={teams}
+            onChange={(value) => setField("teamId", value)}
           />
         </div>
 
-        <p className="mt-4 text-sm text-slate-600">
+        <p className="mt-4 text-sm text-neutral-600">
           I accept the{" "}
-          <button
-            type="button"
-            onClick={onPrivacyPolicyClick}
-            className="font-medium text-apc-900 underline underline-offset-2 hover:text-apc-800"
-          >
+          <button type="button" onClick={onPrivacyPolicyClick} className="font-semibold text-black underline underline-offset-2">
             APC privacy policy
           </button>
         </p>
       </div>
 
       {isDirty && (
-        <div className="flex items-center justify-end gap-2 rounded-lg border border-apc-accent/30 bg-apc-accent/5 px-4 py-3">
-          <span className="mr-auto text-sm text-slate-600">You have unsaved changes.</span>
+        <div className="flex items-center justify-end gap-2 border border-black bg-brand-yellow/10 px-4 py-3">
+          <span className="mr-auto text-sm text-neutral-700">You have unsaved changes.</span>
           <button
             type="button"
             onClick={onDiscard}
             disabled={isSaving}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+            className="border border-black px-3 py-1.5 text-sm font-semibold text-black transition hover:bg-neutral-100 disabled:opacity-50"
           >
             Discard
           </button>
@@ -115,7 +89,7 @@ export const AccountInfoForm = ({
             type="button"
             onClick={onSave}
             disabled={isSaving}
-            className="rounded-lg bg-apc-900 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-apc-800 disabled:opacity-60"
+            className="border border-black bg-black px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60"
           >
             {isSaving ? "Saving…" : "Save changes"}
           </button>
@@ -125,16 +99,21 @@ export const AccountInfoForm = ({
   );
 };
 
-const ReadOnlyField = ({ label, value }: { label: string; value: string }) => {
+const ReadOnlyField = ({ label, value, valid }: { label: string; value: string; valid?: boolean }) => {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-500">{label}</span>
+      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        {label}
+        {valid !== undefined && (
+          <CheckCircle2 className={cn("h-3.5 w-3.5", valid ? "text-emerald-600" : "text-neutral-300")} />
+        )}
+      </span>
       <input
         type="text"
         value={value}
         disabled
         readOnly
-        className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+        className="w-full cursor-not-allowed border border-black bg-neutral-100 px-3 py-2 text-sm text-neutral-600"
       />
     </label>
   );
@@ -145,66 +124,59 @@ const TextField = ({
   value,
   onChange,
   required,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  placeholder?: string;
 }) => {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-500">
-        {label} {required && <span className="text-red-500">*</span>}
+      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        {label} {required && <span className="text-red-600">*</span>}
+        {required && <CheckCircle2 className={cn("h-3.5 w-3.5", value ? "text-emerald-600" : "text-neutral-300")} />}
       </span>
       <input
         type="text"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-apc-accent focus:ring-2 focus:ring-apc-accent/20"
+        placeholder={placeholder}
+        className="w-full border border-black px-3 py-2 text-sm text-black outline-none focus:ring-1 focus:ring-black"
       />
     </label>
   );
 };
 
-const SelectField = ({
-  label,
+const TeamSelectField = ({
   value,
-  options,
+  teams,
   onChange,
-  required,
 }: {
-  label: string;
   value: string;
-  options: SelectOption[];
+  teams: ApiTeam[];
   onChange: (value: string) => void;
-  required?: boolean;
 }) => {
-  const isValid = options.some((option) => option.value === value);
-
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-500">
-        {label} {required && <span className="text-red-500">*</span>}
+      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        Team <span className="text-red-600">*</span>
+        <CheckCircle2 className={cn("h-3.5 w-3.5", value ? "text-emerald-600" : "text-neutral-300")} />
       </span>
-      <div className="flex items-center gap-2">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          required={required}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-apc-accent focus:ring-2 focus:ring-apc-accent/20"
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <CheckCircle2
-          className={cn("h-5 w-5 shrink-0", isValid ? "text-emerald-500" : "text-slate-300")}
-          aria-label={isValid ? `${label} confirmed` : `${label} not set`}
-        />
-      </div>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full border border-black bg-white px-3 py-2 text-sm text-black outline-none focus:ring-1 focus:ring-black"
+      >
+        <option value="">No team</option>
+        {teams.map((team) => (
+          <option key={team.id} value={team.id}>
+            {team.name}
+          </option>
+        ))}
+      </select>
     </label>
   );
 };

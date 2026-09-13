@@ -2,6 +2,8 @@
 
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
+from .models import Organization
+
 
 class IsWorkspaceMember(BasePermission):
     """Authenticated users may only touch objects in their own organization.
@@ -23,6 +25,16 @@ class IsWorkspaceMember(BasePermission):
         return membership is None or membership.is_authorized
 
     def has_object_permission(self, request, view, obj) -> bool:
+        # An Organization *is* the workspace — it has no `organization` FK of
+        # its own, so the generic lookup below (written for objects that
+        # belong to one, like Clip/Playlist/TimelineTrack) always resolved to
+        # None and silently failed every object-level check on it. Invisible
+        # until now since nothing previously called retrieve/update/destroy
+        # on a single Organization (only the list endpoint, which skips
+        # object-level permission checks entirely).
+        if isinstance(obj, Organization):
+            return obj.id == request.user.organization_id
+
         organization_id = getattr(obj, "organization_id", None)
         for related in ("clip", "track", "playlist", "page"):
             if organization_id is not None:
