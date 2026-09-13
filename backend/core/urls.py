@@ -4,6 +4,7 @@ from .views import (
     CookieTokenObtainPairView,
     CookieTokenRefreshView,
     LogoutView,
+    MeAvatarUploadView,
     MeView,
     RegisterView,
     health_check,
@@ -16,4 +17,5 @@ urlpatterns = [
     path("refresh/", CookieTokenRefreshView.as_view(), name="auth-refresh"),
     path("logout/", LogoutView.as_view(), name="auth-logout"),
     path("me/", MeView.as_view(), name="auth-me"),
+    path("me/avatar/", MeAvatarUploadView.as_view(), name="auth-me-avatar"),
 ]

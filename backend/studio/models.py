@@ -19,6 +19,7 @@ class TimelineTrack(models.Model):
         ZOOM = "zoom", "Zoom"
         BLUR = "blur", "Blur"
         TEXT = "text", "Text"
+        CUT = "cut", "Cut"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     clip = models.ForeignKey(Clip, on_delete=models.CASCADE, related_name="tracks")
@@ -84,6 +85,34 @@ class BlurRegion(TimedRegion):
 
     def __str__(self) -> str:
         return f"Blur {self.start_time}s-{self.end_time}s"
+
+
+class Cut(TimedRegion):
+    """A non-destructive timeline decision over a source-media range.
+
+    `KEEP` segments play at normal speed and need no explicit row (the
+    absence of a cut over a range means "keep"); `CUT` removes the range
+    entirely from playback; `SILENCE_SPEEDUP` keeps it but plays it back at
+    `speed_multiplier`x, typically a range `detect-silence` flagged as dead
+    air rather than something the editor removed outright.
+    """
+
+    class CutType(models.TextChoices):
+        KEEP = "keep", "Keep"
+        CUT = "cut", "Cut"
+        SILENCE_SPEEDUP = "silence_speedup", "Silence speedup"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    track = models.ForeignKey(TimelineTrack, on_delete=models.CASCADE, related_name="cuts")
+    cut_type = models.CharField(max_length=20, choices=CutType.choices, default=CutType.CUT)
+    speed_multiplier = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        db_table = "apc_cuts"
+        ordering = ["track", "start_time"]
+
+    def __str__(self) -> str:
+        return f"{self.get_cut_type_display()} {self.start_time}s-{self.end_time}s"
 
 
 class TextOverlay(TimedRegion):

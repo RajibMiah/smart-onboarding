@@ -1,20 +1,27 @@
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import connection
+from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .models import Department, Organization, Team, User, WorkspaceInvitation
+from .models import CustomRole, Department, Organization, SystemRoleTier, Team, User, WorkspaceInvitation
 from .permissions import HasRolePermission, IsWorkspaceMember
 from .serializers import (
     AcceptInvitationSerializer,
+    AvatarUploadSerializer,
+    CustomRoleSerializer,
     CustomTokenObtainPairSerializer,
     DepartmentSerializer,
+    MemberRoleUpdateSerializer,
     OrganizationSerializer,
     OrgMemberSerializer,
     RegisterSerializer,
@@ -135,12 +142,19 @@ class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
-        if refresh_token:
-            try:
-                RefreshToken(refresh_token).blacklist()
-            except TokenError:
-                pass
+        if request.data.get("all_devices"):
+            # Every refresh token ever issued to this user, not just the
+            # current session's — same blacklist-every-OutstandingToken
+            # approach as OrgUserViewSet.revoke.
+            for outstanding in OutstandingToken.objects.filter(user=request.user):
+                BlacklistedToken.objects.get_or_create(token=outstanding)
+        else:
+            refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
+            if refresh_token:
+                try:
+                    RefreshToken(refresh_token).blacklist()
+                except TokenError:
+                    pass
 
         response = Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
         _clear_auth_cookies(response)
@@ -156,14 +170,89 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
-class OrganizationViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only: an organization is provisioned at registration, not edited here."""
+class MeAvatarUploadView(generics.GenericAPIView):
+    """POST /auth/me/avatar/ — multipart image upload, kept off MeView's own
+    PATCH (JSON) so that endpoint doesn't need multipart parsing for every
+    plain profile-field update."""
+
+    serializer_class = AvatarUploadSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        if user.avatar:
+            user.avatar.delete(save=False)
+        user.avatar = serializer.validated_data["avatar"]
+        user.save(update_fields=["avatar"])
+
+        return Response(UserSerializer(user, context={"request": request}).data)
+
+
+class OrganizationViewSet(viewsets.ModelViewSet):
+    """An organization is provisioned at registration; only Owner/Global
+    Admin/HR Manager may edit it afterward (workspace branding/retention
+    settings) — everyone else in the workspace can still read it."""
 
     serializer_class = OrganizationSerializer
     permission_classes = [IsWorkspaceMember]
+    http_method_names = ["get", "patch", "delete", "post", "head", "options"]
 
     def get_queryset(self):
         return Organization.objects.filter(id=self.request.user.organization_id)
+
+    def perform_update(self, serializer):
+        membership = getattr(self.request.user, "membership", None)
+        can_manage = bool(
+            membership and (membership.is_global_admin or membership.role_tier == SystemRoleTier.HR_MANAGER)
+        )
+        if not can_manage:
+            raise PermissionDenied("Only a Global Administrator or HR Manager can update workspace settings.")
+        serializer.save()
+
+    @action(detail=True, methods=["post"], url_path="transfer-ownership")
+    def transfer_ownership(self, request, pk=None):
+        """Owner-only: hands the Organization.owner FK to another member of
+        the same workspace, demoting the current owner to Global Admin
+        (never leaving the workspace ownerless) and promoting the target."""
+        organization = self.get_object()
+        actor_membership = getattr(request.user, "membership", None)
+        if not (actor_membership and organization.owner_id == request.user.id):
+            raise PermissionDenied("Only the current workspace owner can transfer ownership.")
+
+        new_owner_id = request.data.get("new_owner_id")
+        new_owner = User.objects.filter(id=new_owner_id, organization_id=organization.id).first()
+        if new_owner is None:
+            return Response({"detail": "That user isn't a member of this workspace."}, status=status.HTTP_400_BAD_REQUEST)
+        new_owner_membership = getattr(new_owner, "membership", None)
+        if new_owner_membership is None:
+            return Response({"detail": "That user has no workspace membership."}, status=status.HTTP_400_BAD_REQUEST)
+
+        organization.owner = new_owner
+        organization.save(update_fields=["owner"])
+
+        actor_membership.role_tier = SystemRoleTier.GLOBAL_ADMIN
+        actor_membership.save(update_fields=["role_tier", "updated_at"])
+        new_owner_membership.role_tier = SystemRoleTier.OWNER
+        new_owner_membership.is_global_admin = True
+        new_owner_membership.save(update_fields=["role_tier", "is_global_admin", "updated_at"])
+
+        return Response(OrganizationSerializer(organization, context={"request": request}).data)
+
+    def perform_destroy(self, instance):
+        # Owner-only, deliberately stricter than perform_update's Global
+        # Admin/HR Manager gate — deleting the entire tenant (every clip,
+        # playlist, user) is categorically more severe than editing settings.
+        membership = getattr(self.request.user, "membership", None)
+        if not (membership and instance.owner_id == self.request.user.id):
+            raise PermissionDenied("Only the workspace owner can delete the workspace.")
+        confirmed_name = self.request.data.get("confirm_name", "")
+        if confirmed_name != instance.name:
+            raise PermissionDenied("Workspace name confirmation did not match.")
+        instance.delete()
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -189,8 +278,21 @@ class TeamViewSet(viewsets.ModelViewSet):
         serializer.save(organization=self.request.user.organization)
 
 
+def _can_manage_member(actor: User, *, capability: str) -> bool:
+    membership = getattr(actor, "membership", None)
+    if membership is None:
+        return False
+    return membership.is_global_admin or membership.has_permission(capability)
+
+
 class OrgUserViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only "Manage Users" listing: every member of the caller's organization."""
+    """Read-only "Manage Users" listing: every member of the caller's organization.
+
+    Plus two write actions (role assignment, revoke/reactivate) — kept on this
+    same User-keyed viewset rather than inventing a separate "members"
+    resource, since the frontend already only ever has a user id in hand here
+    (there's no membership id exposed anywhere).
+    """
 
     serializer_class = OrgMemberSerializer
     permission_classes = [IsWorkspaceMember]
@@ -198,9 +300,123 @@ class OrgUserViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return (
             User.objects.filter(organization_id=self.request.user.organization_id)
-            .select_related("membership")
+            .select_related("membership", "membership__custom_role")
             .prefetch_related("team_memberships__team__department")
         )
+
+    @action(detail=True, methods=["patch"], url_path="role")
+    def role(self, request, pk=None):
+        if not _can_manage_member(request.user, capability="can_assign_roles"):
+            return Response({"detail": "You don't have permission to assign roles."}, status=status.HTTP_403_FORBIDDEN)
+
+        target = self.get_object()
+        membership = getattr(target, "membership", None)
+        if membership is None:
+            return Response({"detail": "This user has no workspace membership to update."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = MemberRoleUpdateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        # Only an existing global admin/owner may hand out (or take away)
+        # global-admin-equivalent tiers — otherwise an HR Manager granted
+        # can_assign_roles could promote themselves or anyone else straight
+        # to full admin.
+        new_tier = serializer.validated_data.get("role_tier")
+        actor_membership = request.user.membership
+        if new_tier in (SystemRoleTier.OWNER, SystemRoleTier.GLOBAL_ADMIN) and not actor_membership.is_global_admin:
+            return Response(
+                {"detail": "Only a Global Administrator can grant that role."}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        update_fields = []
+        if "role_tier" in serializer.validated_data:
+            membership.role_tier = serializer.validated_data["role_tier"]
+            update_fields.append("role_tier")
+        if "custom_role" in serializer.validated_data:
+            membership.custom_role = serializer.validated_data["custom_role"]
+            update_fields.append("custom_role")
+        if update_fields:
+            membership.save(update_fields=[*update_fields, "updated_at"])
+
+        return Response(OrgMemberSerializer(target).data)
+
+    @action(detail=True, methods=["post"])
+    def revoke(self, request, pk=None):
+        if not _can_manage_member(request.user, capability="can_revoke_access"):
+            return Response({"detail": "You don't have permission to revoke access."}, status=status.HTTP_403_FORBIDDEN)
+
+        target = self.get_object()
+        if target.id == request.user.id:
+            return Response({"detail": "You can't revoke your own access."}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership = getattr(target, "membership", None)
+        if membership is None:
+            return Response({"detail": "This user has no workspace membership to revoke."}, status=status.HTTP_400_BAD_REQUEST)
+        if membership.is_global_admin and not request.user.membership.is_global_admin:
+            return Response(
+                {"detail": "Only a Global Administrator can revoke another administrator."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        membership.is_authorized = False
+        membership.revoked_at = timezone.now()
+        membership.revoked_by = request.user
+        membership.save(update_fields=["is_authorized", "revoked_at", "revoked_by", "updated_at"])
+
+        # Blacklists every refresh token already issued to this user, so
+        # none of them can mint a new access token once the current one
+        # expires. The `IsWorkspaceMember.is_authorized` check is what makes
+        # this take effect immediately, on the very next request — token
+        # blacklisting alone wouldn't invalidate an access token that's
+        # already been issued and hasn't expired yet.
+        for outstanding in OutstandingToken.objects.filter(user=target):
+            BlacklistedToken.objects.get_or_create(token=outstanding)
+
+        return Response(OrgMemberSerializer(target).data)
+
+    @action(detail=True, methods=["post"])
+    def reactivate(self, request, pk=None):
+        if not _can_manage_member(request.user, capability="can_revoke_access"):
+            return Response({"detail": "You don't have permission to reactivate access."}, status=status.HTTP_403_FORBIDDEN)
+
+        target = self.get_object()
+        membership = getattr(target, "membership", None)
+        if membership is None:
+            return Response({"detail": "This user has no workspace membership to reactivate."}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership.is_authorized = True
+        membership.revoked_at = None
+        membership.revoked_by = None
+        membership.save(update_fields=["is_authorized", "revoked_at", "revoked_by", "updated_at"])
+        return Response(OrgMemberSerializer(target).data)
+
+
+class CustomRoleViewSet(viewsets.ModelViewSet):
+    """Admin-defined job roles with granular capability flags.
+
+    Defining a brand-new role template is scoped to Global Admins/Owners
+    only (`is_global_admin`) — a much more sensitive operation than
+    *assigning* an existing one, which `OrgUserViewSet.role` above allows for
+    anyone holding `can_assign_roles` (including an HR Manager).
+    """
+
+    serializer_class = CustomRoleSerializer
+    permission_classes = [IsWorkspaceMember, HasRolePermission]
+    required_roles = ("is_global_admin",)
+
+    def get_queryset(self):
+        return CustomRole.objects.filter(organization_id=self.request.user.organization_id).select_related("department")
+
+    def get_permissions(self):
+        # Reading the role list only requires being in the workspace (e.g.
+        # to populate a role-assignment dropdown) — only mutating requires
+        # is_global_admin.
+        if self.request.method in permissions.SAFE_METHODS:
+            return [IsWorkspaceMember()]
+        return super().get_permissions()
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.user.organization, created_by=self.request.user)
 
 
 def _send_invitation_email(invitation: WorkspaceInvitation) -> None:

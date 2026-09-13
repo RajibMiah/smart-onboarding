@@ -27,3 +27,11 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # gunicorn (unlike `runserver`) never auto-serves static files, so the
+    # browsable API's CSS/JS 404 without this — collectstatic must have
+    # already gathered them into STATIC_ROOT (done in docker-entrypoint.sh).
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # Gives the DRF browsable API's "Log in" / "Log out" links somewhere to
+    # post to (SessionAuthentication needs this — CookieJWTAuthentication
+    # alone has no browsable-API login form).
+    urlpatterns += [path("api-auth/", include("rest_framework.urls"))]

@@ -74,6 +74,7 @@ class ClipSerializer(serializers.ModelSerializer):
             "thumbnail_url",
             "status",
             "visibility",
+            "filter_settings",
             "assets",
             "created_at",
             "updated_at",
@@ -93,4 +94,20 @@ class ClipSerializer(serializers.ModelSerializer):
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.exists():
             raise serializers.ValidationError("A clip with this slug already exists in your workspace.")
+        return value
+
+    def validate_filter_settings(self, value: dict) -> dict:
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("filter_settings must be an object.")
+        allowed_keys = {"brightness", "contrast", "saturation", "volumeGain", "noiseSuppression"}
+        unknown = set(value) - allowed_keys
+        if unknown:
+            raise serializers.ValidationError(f"Unknown filter_settings keys: {', '.join(sorted(unknown))}.")
+        for key in ("brightness", "contrast", "saturation"):
+            if key in value and not (0 <= float(value[key]) <= 200):
+                raise serializers.ValidationError(f"{key} must be between 0 and 200.")
+        if "volumeGain" in value and not (0 <= float(value["volumeGain"]) <= 2):
+            raise serializers.ValidationError("volumeGain must be between 0 and 2.")
+        if "noiseSuppression" in value and not isinstance(value["noiseSuppression"], bool):
+            raise serializers.ValidationError("noiseSuppression must be a boolean.")
         return value

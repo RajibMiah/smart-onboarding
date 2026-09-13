@@ -73,21 +73,44 @@ export const usePlaylists = () => {
     [],
   );
 
-  const addClipToPlaylist = useCallback(async (playlistId: string, clipId: string) => {
-    const created = await playlistItemsApi.create({ playlist: playlistId, clip: clipId });
-    setPlaylists((prev) =>
-      prev.map((playlist) =>
-        playlist.id === playlistId && !playlist.clipIds.includes(clipId)
-          ? {
-              ...playlist,
-              clipIds: [...playlist.clipIds, created.clip],
-              clipCount: playlist.clipCount + 1,
-              updatedAt: new Date().toISOString(),
-            }
-          : playlist,
-      ),
-    );
-  }, []);
+  const addClipToPlaylist = useCallback(
+    async (playlistId: string, clipId: string) => {
+      // Re-saving a clip (retrying after a partial failure, or editing one
+      // that's already published into this same playlist) would otherwise
+      // re-POST a (playlist, clip) pair that's already there, and the
+      // backend's unique-together constraint rejects it with a raw
+      // "The fields playlist, clip must make a unique set." error — already
+      // being a member is the desired end state, not a failure, so treat it
+      // as a no-op both when we already know about it locally...
+      const alreadyMember = playlists.some(
+        (playlist) => playlist.id === playlistId && playlist.clipIds.includes(clipId),
+      );
+      if (alreadyMember) return;
+
+      try {
+        const created = await playlistItemsApi.create({ playlist: playlistId, clip: clipId });
+        setPlaylists((prev) =>
+          prev.map((playlist) =>
+            playlist.id === playlistId && !playlist.clipIds.includes(clipId)
+              ? {
+                  ...playlist,
+                  clipIds: [...playlist.clipIds, created.clip],
+                  clipCount: playlist.clipCount + 1,
+                  updatedAt: new Date().toISOString(),
+                }
+              : playlist,
+          ),
+        );
+      } catch (error) {
+        // ...and when our local copy was stale and the backend is the one
+        // that discovers the pair already exists.
+        const isDuplicateMembership =
+          error instanceof ApiError && error.status === 400 && Boolean(error.fieldErrors?.non_field_errors);
+        if (!isDuplicateMembership) throw error;
+      }
+    },
+    [playlists],
+  );
 
   const renamePlaylist = useCallback(async (id: string, title: string) => {
     setPlaylists((prev) => prev.map((playlist) => (playlist.id === id ? { ...playlist, title } : playlist)));

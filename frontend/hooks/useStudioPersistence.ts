@@ -116,6 +116,8 @@ export function useStudioPersistence({
           blurRegions: draft.timeline.blurRegions,
           textRegions: draft.timeline.textRegions,
           imageOverlays,
+          cuts: draft.timeline.cuts,
+          filters: draft.timeline.filters,
         });
       })
       .catch((error: unknown) => {
@@ -185,6 +187,8 @@ export function useStudioPersistence({
           blurRegions: state.blurRegions,
           textRegions: state.textRegions,
           imageOverlays: overlayDrafts,
+          cuts: state.cuts,
+          filters: state.filters,
         },
         mediaIds: [...new Set([...trackDrafts.map((track) => track.mediaId), ...overlayDrafts.map((overlay) => overlay.mediaId)])],
         createdAt: now,
@@ -211,6 +215,8 @@ export function useStudioPersistence({
     state.zoomRegions,
     state.blurRegions,
     state.textRegions,
+    state.cuts,
+    state.filters,
     projectId,
     title,
     assignedPlaylistId,
@@ -229,7 +235,17 @@ export function useStudioPersistence({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [state.tracks, state.zoomRegions, state.blurRegions, state.textRegions, state.imageOverlays, isRestoring, persistDraft]);
+  }, [
+    state.tracks,
+    state.zoomRegions,
+    state.blurRegions,
+    state.textRegions,
+    state.imageOverlays,
+    state.cuts,
+    state.filters,
+    isRestoring,
+    persistDraft,
+  ]);
 
   useEffect(() => {
     refreshQuota();

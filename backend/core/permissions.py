@@ -2,15 +2,39 @@
 
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
+from .models import Organization
+
 
 class IsWorkspaceMember(BasePermission):
-    """Authenticated users may only touch objects in their own organization."""
+    """Authenticated users may only touch objects in their own organization.
+
+    Also enforces `WorkspaceMembership.is_authorized` — this flag already
+    existed with "False suspends the user" as its documented intent, but
+    nothing actually checked it, so a revoked member's still-valid access
+    token kept working normally until it expired on its own. Since this
+    class gates nearly every viewset in the app, checking it here is what
+    makes a revocation take effect on the very next request rather than
+    only once the user's session naturally expires.
+    """
 
     def has_permission(self, request, view) -> bool:
         user = request.user
-        return bool(user and user.is_authenticated and user.organization_id)
+        if not (user and user.is_authenticated and user.organization_id):
+            return False
+        membership = getattr(user, "membership", None)
+        return membership is None or membership.is_authorized
 
     def has_object_permission(self, request, view, obj) -> bool:
+        # An Organization *is* the workspace — it has no `organization` FK of
+        # its own, so the generic lookup below (written for objects that
+        # belong to one, like Clip/Playlist/TimelineTrack) always resolved to
+        # None and silently failed every object-level check on it. Invisible
+        # until now since nothing previously called retrieve/update/destroy
+        # on a single Organization (only the list endpoint, which skips
+        # object-level permission checks entirely).
+        if isinstance(obj, Organization):
+            return obj.id == request.user.organization_id
+
         organization_id = getattr(obj, "organization_id", None)
         for related in ("clip", "track", "playlist", "page"):
             if organization_id is not None:
@@ -44,6 +68,30 @@ class HasRolePermission(BasePermission):
             return False
 
         return any(getattr(membership, role, False) for role in required_roles)
+
+
+class HasCapability(BasePermission):
+    """Dynamic capability check via `WorkspaceMembership.has_permission(flag)`.
+
+    Usage: set `required_capability = "can_invite_users"` on the view. Unlike
+    `HasRolePermission` (which only ever checks the three hardcoded legacy
+    booleans), this also accounts for the HR Manager tier and any CustomRole
+    flags, via the model method that already encodes that logic.
+    """
+
+    required_capability: str | None = None
+
+    def has_permission(self, request, view) -> bool:
+        capability = getattr(view, "required_capability", self.required_capability)
+        if not capability:
+            return True
+
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+
+        membership = getattr(user, "membership", None)
+        return bool(membership and membership.has_permission(capability))
 
 
 class IsProjectOwnerOrReadOnly(BasePermission):

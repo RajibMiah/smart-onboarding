@@ -4,16 +4,51 @@ from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import Department, Organization, Team, TeamMembership, WorkspaceInvitation, WorkspaceMembership
+from .models import (
+    ROLE_SCOPE_DESCRIPTIONS,
+    CustomRole,
+    Department,
+    Organization,
+    SystemRoleTier,
+    Team,
+    TeamMembership,
+    WorkspaceInvitation,
+    WorkspaceMembership,
+)
 
 User = get_user_model()
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
+    owner_email = serializers.CharField(source="owner.email", read_only=True, default=None)
+
     class Meta:
         model = Organization
-        fields = ["id", "name", "slug", "domain", "logo_url", "tier", "created_at", "updated_at"]
-        read_only_fields = ["id", "slug", "tier", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "domain",
+            "logo_url",
+            "tier",
+            "owner",
+            "owner_email",
+            "settings",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "slug", "tier", "owner", "created_at", "updated_at"]
+
+    def validate_settings(self, value: dict) -> dict:
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("settings must be an object.")
+        allowed_keys = {"retention_days", "default_clip_visibility", "force_strict_theme", "accent_color"}
+        unknown = set(value) - allowed_keys
+        if unknown:
+            raise serializers.ValidationError(f"Unknown settings keys: {', '.join(sorted(unknown))}.")
+        if "default_clip_visibility" in value and value["default_clip_visibility"] not in ("draft", "published"):
+            raise serializers.ValidationError("default_clip_visibility must be 'draft' or 'published'.")
+        return value
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -30,15 +65,104 @@ class TeamSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "organization", "created_at"]
 
 
+class CustomRoleSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source="department.name", read_only=True, default=None)
+
+    class Meta:
+        model = CustomRole
+        fields = [
+            "id",
+            "organization",
+            "name",
+            "description",
+            "created_by",
+            "department",
+            "department_name",
+            *CustomRole.CAPABILITY_FLAGS,
+            "created_at",
+        ]
+        read_only_fields = ["id", "organization", "created_by", "created_at"]
+
+    def validate_department(self, value: Department | None) -> Department | None:
+        if value is not None and value.organization_id != self.context["request"].user.organization_id:
+            raise serializers.ValidationError("That department doesn't belong to your workspace.")
+        return value
+
+
 class WorkspaceMembershipSerializer(serializers.ModelSerializer):
+    custom_role_name = serializers.CharField(source="custom_role.name", read_only=True, default=None)
+    role_display = serializers.SerializerMethodField()
+    role_description = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    team = serializers.SerializerMethodField()
+
     class Meta:
         model = WorkspaceMembership
-        fields = ["is_authorized", "is_creator", "is_global_admin", "is_content_manager", "tags"]
+        fields = [
+            "is_authorized",
+            "is_creator",
+            "is_global_admin",
+            "is_content_manager",
+            "tags",
+            "role_tier",
+            "role_display",
+            "role_description",
+            "custom_role",
+            "custom_role_name",
+            "department",
+            "team",
+            "revoked_at",
+        ]
+
+    def get_role_display(self, obj: WorkspaceMembership) -> str:
+        if obj.role_tier == SystemRoleTier.CUSTOM and obj.custom_role_id:
+            return obj.custom_role.name
+        return SystemRoleTier(obj.role_tier).label
+
+    def get_role_description(self, obj: WorkspaceMembership) -> str:
+        """'[Role Name] - [scope]', e.g. 'Creator - you can create, see and share content'."""
+        scope = obj.custom_role.description if obj.role_tier == SystemRoleTier.CUSTOM and obj.custom_role_id else None
+        scope = scope or ROLE_SCOPE_DESCRIPTIONS.get(obj.role_tier, "")
+        return f"{self.get_role_display(obj)} - {scope}" if scope else self.get_role_display(obj)
+
+    def _team_membership(self, obj: WorkspaceMembership) -> TeamMembership | None:
+        return TeamMembership.objects.filter(user_id=obj.user_id).select_related("team__department").first()
+
+    def get_department(self, obj: WorkspaceMembership) -> dict | None:
+        membership = self._team_membership(obj)
+        department = membership.team.department if membership and membership.team.department_id else None
+        return {"id": str(department.id), "name": department.name} if department else None
+
+    def get_team(self, obj: WorkspaceMembership) -> dict | None:
+        membership = self._team_membership(obj)
+        return {"id": str(membership.team.id), "name": membership.team.name} if membership else None
+
+
+class MemberRoleUpdateSerializer(serializers.Serializer):
+    """PATCH payload for /users/<id>/role/ — role_tier and/or custom_role, either may be omitted."""
+
+    role_tier = serializers.ChoiceField(choices=SystemRoleTier.choices, required=False)
+    custom_role = serializers.PrimaryKeyRelatedField(
+        queryset=CustomRole.objects.all(), required=False, allow_null=True
+    )
+
+    def validate_custom_role(self, value: CustomRole | None) -> CustomRole | None:
+        if value is not None and value.organization_id != self.context["request"].user.organization_id:
+            raise serializers.ValidationError("That custom role doesn't belong to your workspace.")
+        return value
 
 
 class UserSerializer(serializers.ModelSerializer):
     membership = WorkspaceMembershipSerializer(read_only=True)
     full_name = serializers.CharField(read_only=True)
+    avatar_url = serializers.SerializerMethodField()
+    workspace = serializers.SerializerMethodField()
+    # Self-service team switching — write-only, resolved to a TeamMembership
+    # swap in UserSerializer.update() below. Department isn't independently
+    # settable: it's always derived from whichever team the user is on.
+    team_id = serializers.PrimaryKeyRelatedField(
+        source="team", queryset=Team.objects.all(), required=False, allow_null=True, write_only=True
+    )
 
     class Meta:
         model = User
@@ -52,11 +176,42 @@ class UserSerializer(serializers.ModelSerializer):
             "location",
             "language",
             "organization",
+            "workspace",
             "is_active",
             "membership",
+            "team_id",
             "created_at",
         ]
         read_only_fields = ["id", "email", "organization", "is_active", "created_at"]
+
+    def get_avatar_url(self, obj: User) -> str:
+        if obj.avatar:
+            request = self.context.get("request")
+            return request.build_absolute_uri(obj.avatar.url) if request else obj.avatar.url
+        return obj.avatar_url
+
+    def get_workspace(self, obj: User) -> dict | None:
+        if not obj.organization_id:
+            return None
+        return {"id": str(obj.organization_id), "name": obj.organization.name, "slug": obj.organization.slug}
+
+    def validate_team_id(self, value: Team | None) -> Team | None:
+        if value is not None and value.organization_id != self.context["request"].user.organization_id:
+            raise serializers.ValidationError("That team doesn't belong to your workspace.")
+        return value
+
+    def update(self, instance: User, validated_data: dict) -> User:
+        team = validated_data.pop("team", "unset") if "team" in validated_data else "unset"
+        instance = super().update(instance, validated_data)
+        if team != "unset":
+            TeamMembership.objects.filter(user=instance).delete()
+            if team is not None:
+                TeamMembership.objects.create(team=team, user=instance)
+        return instance
+
+
+class AvatarUploadSerializer(serializers.Serializer):
+    avatar = serializers.ImageField()
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -215,4 +370,5 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["is_creator"] = bool(membership and membership.is_creator)
         token["is_global_admin"] = bool(membership and membership.is_global_admin)
         token["is_content_manager"] = bool(membership and membership.is_content_manager)
+        token["role_tier"] = membership.role_tier if membership else None
         return token

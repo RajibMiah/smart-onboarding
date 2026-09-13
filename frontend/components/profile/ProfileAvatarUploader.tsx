@@ -1,47 +1,62 @@
 "use client";
 
-import { useEffect } from "react";
+import { useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 
-import { Avatar } from "@/components/ui/Avatar";
-import { useAvatarUpload } from "@/hooks/useAvatarUpload";
+const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_TYPES = ["image/jpeg", "image/png"];
 
 interface ProfileAvatarUploaderProps {
   initials: string;
-  /** Currently-saved avatar (shared via UIContext) — shown until a new file is picked. */
-  avatarUrl: string | null;
-  onAvatarChange: (url: string) => void;
+  avatarUrl: string;
+  isUploading: boolean;
+  onUpload: (file: File) => Promise<void>;
 }
 
-/** Circular avatar with an upload trigger; previews the picked image instantly, client-side only. */
-export const ProfileAvatarUploader = ({ initials, avatarUrl, onAvatarChange }: ProfileAvatarUploaderProps) => {
-  const { previewUrl, error, fileInputRef, openFilePicker, handleFileChange } = useAvatarUpload();
+/** Circular avatar with a real upload — POSTs straight to /auth/me/avatar/, no client-only preview. */
+export const ProfileAvatarUploader = ({ initials, avatarUrl, isUploading, onUpload }: ProfileAvatarUploaderProps) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Bubble a freshly-picked image up to the shared UIContext avatar once the
-  // hook's own validation/object-URL creation has settled.
-  useEffect(() => {
-    if (previewUrl) onAvatarChange(previewUrl);
-  }, [previewUrl, onAvatarChange]);
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
 
-  const displayedUrl = previewUrl ?? avatarUrl;
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setError("Please choose a JPG or PNG image.");
+      return;
+    }
+    if (file.size > MAX_SIZE_BYTES) {
+      setError("Image must be 5MB or smaller.");
+      return;
+    }
+    setError(null);
+    try {
+      await onUpload(file);
+    } catch {
+      setError("Couldn't upload that image — try again.");
+    }
+  };
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="h-28 w-28 overflow-hidden rounded-full ring-4 ring-white shadow-popover">
-        {displayedUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- object-URL avatar preview
-          <img src={displayedUrl} alt="" className="h-full w-full object-cover" />
+      <div className="flex h-28 w-28 items-center justify-center overflow-hidden border-2 border-black bg-black text-3xl font-bold text-white">
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- backend-hosted avatar URL
+          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          <Avatar initials={initials} gradient="from-rose-500 to-orange-600" fill />
+          initials
         )}
       </div>
 
       <button
         type="button"
-        onClick={openFilePicker}
-        className="flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-apc-900"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isUploading}
+        className="flex items-center gap-1.5 text-sm font-semibold text-black transition hover:underline disabled:opacity-50"
       >
-        <Pencil className="h-3.5 w-3.5" /> Upload
+        <Pencil className="h-3.5 w-3.5" /> {isUploading ? "Uploading…" : "Upload"}
       </button>
 
       <input
@@ -49,7 +64,7 @@ export const ProfileAvatarUploader = ({ initials, avatarUrl, onAvatarChange }: P
         type="file"
         accept="image/jpeg,image/png"
         className="hidden"
-        onChange={handleFileChange}
+        onChange={(event) => void handleFileChange(event)}
         aria-label="Upload profile picture"
       />
 

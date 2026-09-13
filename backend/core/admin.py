@@ -1,7 +1,16 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Department, Organization, Team, TeamMembership, User, WorkspaceInvitation, WorkspaceMembership
+from .models import (
+    CustomRole,
+    Department,
+    Organization,
+    Team,
+    TeamMembership,
+    User,
+    WorkspaceInvitation,
+    WorkspaceMembership,
+)
 
 
 @admin.register(User)
@@ -32,7 +41,19 @@ class WorkspaceInvitationAdmin(admin.ModelAdmin):
     search_fields = ["email", "organization__name"]
 
 
+@admin.register(WorkspaceMembership)
+class WorkspaceMembershipAdmin(admin.ModelAdmin):
+    list_display = ["user", "organization", "role_tier", "is_authorized", "is_global_admin", "custom_role"]
+    list_filter = ["role_tier", "is_authorized", "is_global_admin"]
+    search_fields = ["user__email"]
+
+
+@admin.register(CustomRole)
+class CustomRoleAdmin(admin.ModelAdmin):
+    list_display = ["name", "organization", "department", "created_by", "created_at"]
+    search_fields = ["name", "organization__name"]
+
+
 admin.site.register(Department)
 admin.site.register(Team)
 admin.site.register(TeamMembership)
-admin.site.register(WorkspaceMembership)

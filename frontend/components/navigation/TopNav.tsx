@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, ChevronDown, FileText, ListVideo, Menu, MessageSquarePlus, Plus, Search } from "lucide-react";
+import { ChevronDown, FileText, ListVideo, Menu, MessageSquarePlus, Plus, Search } from "lucide-react";
 
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useToast } from "@/hooks/useToast";
 import { useUI } from "@/context/ui-context";
+import { NotificationCenter } from "@/components/layout/NotificationCenter";
+import { ShareModal } from "@/components/library/ShareModal";
 import { Toast } from "@/components/ui/Toast";
 import { UserMenuDropdown } from "@/components/navigation/UserMenuDropdown";
 import { cn } from "@/lib/utils";
@@ -35,7 +37,7 @@ export const TopNav = () => {
       <SearchBar />
       <div className="flex items-center gap-2 sm:gap-3">
         <CreateSplitButton />
-        <NotificationButton />
+        <NotificationCenter />
         <UserMenuDropdown
           user={user}
           avatarUrl={avatarUrl}
@@ -113,6 +115,7 @@ const SearchBar = () => {
 const CreateSplitButton = () => {
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(containerRef, () => setMenuOpen(false), menuOpen);
@@ -152,6 +155,10 @@ const CreateSplitButton = () => {
               role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
+                if (id === "request") {
+                  setIsRequestModalOpen(true);
+                  return;
+                }
                 toast.show(`${label} isn't available in this preview yet.`);
               }}
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-black transition hover:bg-neutral-100"
@@ -162,19 +169,8 @@ const CreateSplitButton = () => {
           ))}
         </div>
       )}
-    </div>
-  );
-};
 
-const NotificationButton = () => {
-  return (
-    <button
-      type="button"
-      className="relative border-2 border-transparent p-2 text-black transition hover:border-black"
-      aria-label="Notifications"
-    >
-      <Bell className="h-5 w-5" />
-      <span className="absolute right-1.5 top-1.5 h-2 w-2 border border-black bg-brand-yellow" />
-    </button>
+      <ShareModal isOpen={isRequestModalOpen} onClose={() => setIsRequestModalOpen(false)} />
+    </div>
   );
 };

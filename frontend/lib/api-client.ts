@@ -96,12 +96,41 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 // Domain types (mirrors backend/*/serializers.py output)
 // ---------------------------------------------------------------------------
 
+export type ApiSystemRoleTier =
+  | "owner"
+  | "global_admin"
+  | "hr_manager"
+  | "project_manager"
+  | "team_lead"
+  | "creator"
+  | "viewer"
+  | "custom";
+
+export interface ApiRoleRef {
+  id: string;
+  name: string;
+}
+
 export interface ApiWorkspaceMembership {
   is_authorized: boolean;
   is_creator: boolean;
   is_global_admin: boolean;
   is_content_manager: boolean;
   tags: string[];
+  role_tier: ApiSystemRoleTier;
+  role_display: string;
+  role_description: string;
+  custom_role: string | null;
+  custom_role_name: string | null;
+  department: ApiRoleRef | null;
+  team: ApiRoleRef | null;
+  revoked_at: string | null;
+}
+
+export interface ApiUserWorkspace {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 export interface ApiUser {
@@ -114,9 +143,17 @@ export interface ApiUser {
   location: string;
   language: string;
   organization: string | null;
+  workspace: ApiUserWorkspace | null;
   is_active: boolean;
   membership: ApiWorkspaceMembership | null;
   created_at: string;
+}
+
+export interface ApiWorkspaceSettings {
+  retention_days: number | null;
+  default_clip_visibility: "draft" | "published";
+  force_strict_theme: boolean;
+  accent_color: string;
 }
 
 export interface ApiOrganization {
@@ -126,9 +163,32 @@ export interface ApiOrganization {
   domain: string;
   logo_url: string;
   tier: string;
+  owner: string | null;
+  owner_email: string | null;
+  settings: ApiWorkspaceSettings;
   created_at: string;
   updated_at: string;
 }
+
+export interface WorkspaceUpdatePayload {
+  name?: string;
+  domain?: string;
+  logo_url?: string;
+  settings?: Partial<ApiWorkspaceSettings>;
+}
+
+export const organizationsApi = {
+  current: () => request<Paginated<ApiOrganization>>("/organizations/").then((page) => page.results[0] ?? null),
+  update: (id: string, payload: WorkspaceUpdatePayload) =>
+    request<ApiOrganization>(`/organizations/${id}/`, { method: "PATCH", body: payload }),
+  transferOwnership: (id: string, newOwnerId: string) =>
+    request<ApiOrganization>(`/organizations/${id}/transfer-ownership/`, {
+      method: "POST",
+      body: { new_owner_id: newOwnerId },
+    }),
+  remove: (id: string, confirmName: string) =>
+    request<void>(`/organizations/${id}/`, { method: "DELETE", body: { confirm_name: confirmName } }),
+};
 
 export interface ApiTeam {
   id: string;
@@ -181,6 +241,13 @@ export interface ApiClip {
   thumbnail_url: string;
   status: ClipStatus;
   visibility: ClipVisibility;
+  filter_settings: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    volumeGain: number;
+    noiseSuppression: boolean;
+  };
   assets: ApiMediaAsset[];
   created_at: string;
   updated_at: string;
@@ -246,10 +313,17 @@ export const authApi = {
   register: (payload: RegisterPayload) => request<ApiUser>("/auth/register/", { method: "POST", body: payload }),
   login: (payload: { email: string; password: string }) =>
     request<{ detail: string }>("/auth/login/", { method: "POST", body: payload }),
-  logout: () => request<{ detail: string }>("/auth/logout/", { method: "POST" }),
+  logout: (options?: { allDevices?: boolean }) =>
+    request<{ detail: string }>("/auth/logout/", { method: "POST", body: { all_devices: Boolean(options?.allDevices) } }),
   me: () => request<ApiUser>("/auth/me/"),
-  updateMe: (payload: Partial<Pick<ApiUser, "first_name" | "last_name" | "avatar_url" | "location" | "language">>) =>
-    request<ApiUser>("/auth/me/", { method: "PATCH", body: payload }),
+  updateMe: (
+    payload: Partial<Pick<ApiUser, "first_name" | "last_name" | "location" | "language">> & { team_id?: string | null },
+  ) => request<ApiUser>("/auth/me/", { method: "PATCH", body: payload }),
+  uploadAvatar: (file: Blob) => {
+    const form = new FormData();
+    form.set("avatar", file, "avatar.jpg");
+    return request<ApiUser>("/auth/me/avatar/", { method: "POST", body: form });
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -267,8 +341,54 @@ export interface ApiOrgUser {
   created_at: string;
 }
 
+export interface MemberRoleUpdatePayload {
+  role_tier?: ApiSystemRoleTier;
+  custom_role?: string | null;
+}
+
 export const usersApi = {
   list: () => request<Paginated<ApiOrgUser>>("/users/"),
+  updateRole: (id: string, payload: MemberRoleUpdatePayload) =>
+    request<ApiOrgUser>(`/users/${id}/role/`, { method: "PATCH", body: payload }),
+  revoke: (id: string) => request<ApiOrgUser>(`/users/${id}/revoke/`, { method: "POST" }),
+  reactivate: (id: string) => request<ApiOrgUser>(`/users/${id}/reactivate/`, { method: "POST" }),
+};
+
+export const CUSTOM_ROLE_CAPABILITY_FLAGS = [
+  "can_invite_users",
+  "can_manage_departments",
+  "can_manage_teams",
+  "can_assign_roles",
+  "can_publish_public_clips",
+  "can_manage_playlists",
+  "can_approve_requests",
+  "can_view_analytics",
+  "can_revoke_access",
+] as const;
+
+export type CustomRoleCapabilityFlag = (typeof CUSTOM_ROLE_CAPABILITY_FLAGS)[number];
+
+export type ApiCustomRole = {
+  id: string;
+  organization: string;
+  name: string;
+  description: string;
+  created_by: string | null;
+  department: string | null;
+  department_name: string | null;
+  created_at: string;
+} & Record<CustomRoleCapabilityFlag, boolean>;
+
+export type CustomRolePayload = {
+  name: string;
+  description?: string;
+  department?: string | null;
+} & Partial<Record<CustomRoleCapabilityFlag, boolean>>;
+
+export const customRolesApi = {
+  list: () => request<Paginated<ApiCustomRole>>("/custom-roles/"),
+  create: (payload: CustomRolePayload) => request<ApiCustomRole>("/custom-roles/", { method: "POST", body: payload }),
+  remove: (id: string) => request<void>(`/custom-roles/${id}/`, { method: "DELETE" }),
 };
 
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
@@ -338,6 +458,13 @@ export interface ClipWritePayload {
   visibility?: ClipVisibility;
   duration_seconds?: number;
   thumbnail_url?: string;
+  filter_settings?: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    volumeGain: number;
+    noiseSuppression: boolean;
+  };
 }
 
 export const clipsApi = {
@@ -420,7 +547,7 @@ export const mediaAssetsApi = {
 // Studio: timeline tracks + zoom/blur/text overlay regions
 // ---------------------------------------------------------------------------
 
-export type TrackType = "video" | "audio" | "zoom" | "blur" | "text";
+export type TrackType = "video" | "audio" | "zoom" | "blur" | "text" | "cut";
 
 export interface ApiZoomRegion {
   id: string;
@@ -460,6 +587,15 @@ export interface ApiTextOverlay {
   end_time: string;
 }
 
+export interface ApiCut {
+  id: string;
+  track: string;
+  cut_type: "keep" | "silence_speedup" | "cut";
+  speed_multiplier: string | null;
+  start_time: string;
+  end_time: string;
+}
+
 export interface ApiTimelineTrack {
   id: string;
   clip: string;
@@ -468,6 +604,7 @@ export interface ApiTimelineTrack {
   zoom_regions: ApiZoomRegion[];
   blur_regions: ApiBlurRegion[];
   text_overlays: ApiTextOverlay[];
+  cuts: ApiCut[];
   created_at: string;
 }
 
@@ -489,6 +626,10 @@ export const blurRegionsApi = {
 export const textOverlaysApi = {
   create: (payload: Omit<ApiTextOverlay, "id">) =>
     request<ApiTextOverlay>("/text-overlays/", { method: "POST", body: payload }),
+};
+
+export const cutsApi = {
+  create: (payload: Omit<ApiCut, "id">) => request<ApiCut>("/cuts/", { method: "POST", body: payload }),
 };
 
 // ---------------------------------------------------------------------------
@@ -547,8 +688,151 @@ export const playlistItemsApi = {
 
 export const teamsApi = {
   list: () => request<Paginated<ApiTeam>>("/teams/"),
+  create: (payload: { name: string; department?: string | null }) =>
+    request<ApiTeam>("/teams/", { method: "POST", body: payload }),
 };
 
 export const departmentsApi = {
   list: () => request<Paginated<ApiDepartment>>("/departments/"),
+  create: (payload: { name: string; description?: string }) =>
+    request<ApiDepartment>("/departments/", { method: "POST", body: payload }),
+};
+
+// ---------------------------------------------------------------------------
+// Send-with-Request sharing/feedback-request inbox
+// ---------------------------------------------------------------------------
+
+export type ApiRequestContentType = "clip" | "playlist";
+export type ApiRequestType = "feedback" | "approval" | "update_required" | "task";
+export type ApiRequestPriority = "low" | "medium" | "high" | "urgent";
+export type ApiRequestStatus = "pending" | "approved" | "changes_requested" | "completed" | "canceled";
+export type ApiRequestAction = "approve" | "request_changes" | "complete";
+
+export interface ApiMediaShareRequest {
+  id: string;
+  organization: string;
+  created_by: string;
+  created_by_name: string;
+  content_type: ApiRequestContentType;
+  object_id: string;
+  content_title: string;
+  content_thumbnail_url: string;
+  target_user: string | null;
+  target_user_name: string | null;
+  target_team: string | null;
+  target_team_name: string | null;
+  target_department: string | null;
+  target_department_name: string | null;
+  request_type: ApiRequestType;
+  priority: ApiRequestPriority;
+  status: ApiRequestStatus;
+  message: string;
+  due_date: string | null;
+  resolution_note: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MediaShareRequestPayload {
+  content_type: ApiRequestContentType;
+  object_id: string;
+  target_user?: string | null;
+  target_team?: string | null;
+  target_department?: string | null;
+  request_type: ApiRequestType;
+  priority: ApiRequestPriority;
+  message: string;
+  due_date?: string | null;
+}
+
+export const shareRequestsApi = {
+  list: (params: Record<string, string> = {}) =>
+    request<Paginated<ApiMediaShareRequest>>(`/requests/?${new URLSearchParams(params).toString()}`),
+  create: (payload: MediaShareRequestPayload) =>
+    request<ApiMediaShareRequest>("/requests/", { method: "POST", body: payload }),
+  remove: (id: string) => request<void>(`/requests/${id}/`, { method: "DELETE" }),
+  resolve: (id: string, action: ApiRequestAction, note = "") =>
+    request<ApiMediaShareRequest>(`/requests/${id}/action/`, { method: "POST", body: { action, note } }),
+};
+
+export type ApiSharePermission = "view" | "comment" | "edit";
+
+export interface ApiSharedContent {
+  id: string;
+  organization: string;
+  shared_by: string;
+  shared_by_name: string;
+  shared_by_avatar_url: string;
+  content_type: ApiRequestContentType;
+  object_id: string;
+  content_title: string;
+  content_thumbnail_url: string;
+  target_user: string | null;
+  target_user_name: string | null;
+  target_team: string | null;
+  target_team_name: string | null;
+  target_department: string | null;
+  target_department_name: string | null;
+  permission: ApiSharePermission;
+  created_at: string;
+}
+
+export interface SharedContentPayload {
+  content_type: ApiRequestContentType;
+  object_id: string;
+  target_user?: string | null;
+  target_team?: string | null;
+  target_department?: string | null;
+  permission: ApiSharePermission;
+}
+
+export const sharedContentApi = {
+  list: (params: Record<string, string> = {}) =>
+    request<Paginated<ApiSharedContent>>(`/shared-content/?${new URLSearchParams(params).toString()}`),
+  create: (payload: SharedContentPayload) =>
+    request<ApiSharedContent>("/shared-content/", { method: "POST", body: payload }),
+};
+
+export interface ApiSharedFeedItem {
+  id: string;
+  kind: "share" | "request";
+  content_type: ApiRequestContentType;
+  object_id: string;
+  content_title: string;
+  content_thumbnail_url: string;
+  actor_name: string;
+  actor_avatar_url: string;
+  target_label: string;
+  permission: ApiSharePermission | null;
+  request_type: ApiRequestType | null;
+  status: ApiRequestStatus | null;
+  created_at: string;
+}
+
+export const sharedFeedApi = {
+  list: (scope: "with_me" | "by_me") =>
+    request<{ count: number; results: ApiSharedFeedItem[] }>(`/sharing/feed/?scope=${scope}`),
+};
+
+export type ApiNotificationType = "content_shared" | "request_created" | "request_resolved";
+
+export interface ApiNotification {
+  id: string;
+  sender: string | null;
+  sender_name: string | null;
+  sender_avatar_url: string | null;
+  notification_type: ApiNotificationType;
+  title: string;
+  message: string;
+  action_url: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export const notificationsApi = {
+  list: (params: Record<string, string> = {}) =>
+    request<Paginated<ApiNotification>>(`/notifications/?${new URLSearchParams(params).toString()}`),
+  markRead: (id: string) => request<ApiNotification>(`/notifications/${id}/read/`, { method: "PATCH" }),
+  markAllRead: () => request<{ updated: number }>("/notifications/mark-all-read/", { method: "POST" }),
 };

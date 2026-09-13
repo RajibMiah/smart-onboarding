@@ -4,7 +4,7 @@ __pycache__
 .env
 db.sqlite3
 staticfiles
-media
+mediafiles
 .git
 .gitignore
 README.md

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import BlurRegion, TextOverlay, TimelineTrack, ZoomRegion
+from .models import BlurRegion, Cut, TextOverlay, TimelineTrack, ZoomRegion
 
 
 class TimedRegionSerializer(serializers.ModelSerializer):
@@ -46,10 +46,26 @@ class TextOverlaySerializer(TimedRegionSerializer):
         read_only_fields = ["id"]
 
 
+class CutSerializer(TimedRegionSerializer):
+    class Meta:
+        model = Cut
+        fields = ["id", "track", "cut_type", "speed_multiplier", "start_time", "end_time"]
+        read_only_fields = ["id"]
+
+    def validate(self, attrs: dict) -> dict:
+        attrs = super().validate(attrs)
+        cut_type = attrs.get("cut_type", getattr(self.instance, "cut_type", None))
+        speed_multiplier = attrs.get("speed_multiplier", getattr(self.instance, "speed_multiplier", None))
+        if cut_type == Cut.CutType.SILENCE_SPEEDUP and not speed_multiplier:
+            raise serializers.ValidationError("speed_multiplier is required for a silence_speedup cut.")
+        return attrs
+
+
 class TimelineTrackSerializer(serializers.ModelSerializer):
     zoom_regions = ZoomRegionSerializer(many=True, read_only=True)
     blur_regions = BlurRegionSerializer(many=True, read_only=True)
     text_overlays = TextOverlaySerializer(many=True, read_only=True)
+    cuts = CutSerializer(many=True, read_only=True)
 
     class Meta:
         model = TimelineTrack
@@ -61,6 +77,7 @@ class TimelineTrackSerializer(serializers.ModelSerializer):
             "zoom_regions",
             "blur_regions",
             "text_overlays",
+            "cuts",
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]

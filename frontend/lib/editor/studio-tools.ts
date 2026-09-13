@@ -1,4 +1,4 @@
-import { Blend, Clapperboard, Music, Settings, Shapes, Sparkles, Type, ZoomIn } from "lucide-react";
+import { Blend, Clapperboard, Music, Scissors, Settings, Shapes, Sparkles, Type, ZoomIn } from "lucide-react";
 
 import type { StudioTool, StudioToolMeta } from "@/types/studio";
 
@@ -10,6 +10,7 @@ export const STUDIO_TOOLS: StudioToolMeta[] = [
   { id: "auto-edit", label: "Auto-edit", icon: Sparkles, group: "media" },
   { id: "media", label: "Media", icon: Clapperboard, group: "media" },
   { id: "audio", label: "Audio", icon: Music, group: "media" },
+  { id: "cuts", label: "Cuts", icon: Scissors, group: "overlay" },
   { id: "blur", label: "Blur", icon: Blend, group: "overlay" },
   { id: "text", label: "Text", icon: Type, group: "overlay" },
   { id: "elements", label: "Elements", icon: Shapes, group: "overlay" },

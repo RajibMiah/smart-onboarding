@@ -73,8 +73,11 @@ export const useTimelinePlayback = (): UseTimelinePlaybackResult => {
     const video = videoRef.current;
     if (!video || !activeClip) return;
     video.muted = activeClip.muted;
-    video.volume = activeClip.volume;
-  }, [activeClip]);
+    // volumeGain is a project-wide multiplier on top of the clip's own volume;
+    // native <video>.volume caps at 1, so gain above 1x approaches full volume
+    // rather than truly boosting past it (that needs a Web Audio GainNode).
+    video.volume = Math.min(1, Math.max(0, activeClip.volume * state.filters.volumeGain));
+  }, [activeClip, state.filters.volumeGain]);
 
   // Drive the shared playhead from the element while it plays this clip.
   useEffect(() => {

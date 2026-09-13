@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "media",
     "studio",
     "collaboration",
+    "sharing",
 ]
 
 AUTH_USER_MODEL = "core.User"
@@ -150,6 +151,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Local-disk media storage for recorded clips/thumbnails uploaded from the
 # Studio editor. A real deployment would swap this for S3/GCS-backed storage
@@ -161,11 +163,17 @@ MEDIA_ROOT = BASE_DIR / "mediafiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    "DEFAULT_RENDERER_CLASSES": [
-        "rest_framework.renderers.JSONRenderer",
-    ],
+    "DEFAULT_RENDERER_CLASSES": (
+        [
+            "rest_framework.renderers.JSONRenderer",
+            "rest_framework.renderers.BrowsableAPIRenderer",
+        ]
+        if DEBUG
+        else ["rest_framework.renderers.JSONRenderer"]
+    ),
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "core.authentication.CookieJWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

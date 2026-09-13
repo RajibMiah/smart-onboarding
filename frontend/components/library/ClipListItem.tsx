@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Copy, FolderInput, Pencil, Trash2 } from "lucide-react";
+import { Copy, FolderInput, Pencil, Share2, Trash2 } from "lucide-react";
 
 import { EditorialCard } from "@/components/ui/EditorialCard";
 import { formatDuration, formatRelativeTime } from "@/lib/utils";
@@ -15,9 +15,10 @@ interface ClipListItemProps {
   onMoveToProject?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  onShare?: () => void;
 }
 
-export const ClipListItem = ({ clip, onRename, onMoveToProject, onDuplicate, onDelete }: ClipListItemProps) => {
+export const ClipListItem = ({ clip, onRename, onMoveToProject, onDuplicate, onDelete, onShare }: ClipListItemProps) => {
   const router = useRouter();
   const href = `/studio?clip=${clip.id}`;
 
@@ -56,6 +57,7 @@ export const ClipListItem = ({ clip, onRename, onMoveToProject, onDuplicate, onD
               itemLabel={clip.title}
               items={[
                 { icon: Pencil, label: "Rename", onClick: onRename },
+                { icon: Share2, label: "Share & Request", onClick: onShare },
                 { icon: FolderInput, label: "Move to Project", onClick: onMoveToProject },
                 { icon: Copy, label: "Duplicate", onClick: onDuplicate },
                 { icon: Trash2, label: "Delete", tone: "danger", onClick: onDelete, dividerBefore: true },

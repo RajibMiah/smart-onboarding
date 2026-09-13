@@ -17,4 +17,9 @@ until python manage.py migrate --noinput; do
   sleep 3
 done
 
+# Gathers DRF/admin's own static assets into STATIC_ROOT — gunicorn has no
+# equivalent of `runserver`'s automatic static serving, so without this the
+# browsable API and Django admin render with no CSS/JS at all.
+python manage.py collectstatic --noinput
+
 exec "$@"

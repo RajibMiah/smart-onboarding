@@ -11,10 +11,18 @@ interface ReviewHeaderProps {
   onTogglePublished: () => void;
   onEnableVersioning: () => void;
   onDone: () => void;
+  isSaving: boolean;
 }
 
 /** Top action bar for the Review & Publish page — no dashboard chrome, mirrors the Studio's own header. */
-export const ReviewHeader = ({ onEditClick, isPublished, onTogglePublished, onEnableVersioning, onDone }: ReviewHeaderProps) => {
+export const ReviewHeader = ({
+  onEditClick,
+  isPublished,
+  onTogglePublished,
+  onEnableVersioning,
+  onDone,
+  isSaving,
+}: ReviewHeaderProps) => {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-black px-4">
       <button
@@ -61,9 +69,10 @@ export const ReviewHeader = ({ onEditClick, isPublished, onTogglePublished, onEn
         <button
           type="button"
           onClick={onDone}
-          className="border border-black bg-black px-5 py-2 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-neutral-800"
+          disabled={isSaving}
+          className="border border-black bg-black px-5 py-2 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Done ✓
+          {isSaving ? "Saving…" : "Done ✓"}
         </button>
       </div>
     </header>

@@ -46,7 +46,7 @@ export const VideoCanvas = ({
   onOpenLibrary,
   onTurnSlides,
 }: VideoCanvasProps) => {
-  const { videoClips, state, activeZoomRegion, addZoomRegion, cancelZoomDrawing } = useEditor();
+  const { videoClips, state, activeZoomRegion, addZoomRegion, cancelZoomDrawing, cssFilter } = useEditor();
   const { videoRef, activeClip } = useTimelinePlayback();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const canvasBoxRef = useRef<HTMLDivElement>(null);
@@ -131,8 +131,17 @@ export const VideoCanvas = ({
             transform: videoTransform,
             transformOrigin: videoTransformOrigin,
             transition: "transform 300ms ease",
+            filter: cssFilter,
           }}
           playsInline
+          // Without this, a clip resumed from the backend (a cross-origin URL
+          // relative to this Next.js origin) loads in no-cors mode and gets
+          // silently discarded as an opaque response by this app's COEP
+          // require-corp policy (set in next.config.ts for ffmpeg.wasm) —
+          // the video never plays and the playhead never advances, even
+          // though the backend already sends valid CORS headers. Harmless
+          // for local blob: URLs (recordings/uploads), which are same-origin.
+          crossOrigin="anonymous"
         />
 
         {state.isDrawingZoom && (

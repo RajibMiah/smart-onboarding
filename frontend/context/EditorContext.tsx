@@ -11,6 +11,7 @@ import {
 
 import { createTimelineClipFromAsset } from "@/lib/editor/create-clip";
 import { clipTimelineEnd, type CanvasAspectRatio, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
+import { DEFAULT_FILTER_SETTINGS, cssFilterString, type TimelineCut, type VideoFilterSettings } from "@/types/project";
 import type { BlurRegion, BoundingBox, ImageOverlay, TextRegion } from "@/types/overlays";
 import type { ZoomRegion, ZoomRegionBounds } from "@/types/zoom";
 
@@ -43,6 +44,13 @@ interface EditorState {
   selectedTextId: string | null;
   imageOverlays: ImageOverlay[];
   selectedImageOverlayId: string | null;
+  cuts: TimelineCut[];
+  /** Non-destructive playback adjustments — brightness/contrast/saturation drive
+   *  a live CSS filter; volumeGain/noiseSuppression are persisted metadata only. */
+  filters: VideoFilterSettings;
+  /** The Studio's own modal flag — it can't use the dashboard's `UIProvider`-based
+   *  `useModal`, since `/studio` sits outside that provider's route group. */
+  isUploadModalOpen: boolean;
   history: { past: TimelineClip[][]; future: TimelineClip[][] };
   /** Set when this session was opened to resume editing a previously-saved clip, so
    *  Review knows to update that clip instead of creating a new one on save. */
@@ -87,6 +95,12 @@ type Action =
   | { type: "UPDATE_IMAGE_OVERLAY"; id: string; changes: Partial<ImageOverlay> }
   | { type: "REMOVE_IMAGE_OVERLAY"; id: string }
   | { type: "SELECT_IMAGE_OVERLAY"; id: string | null }
+  | { type: "SET_UPLOAD_MODAL_OPEN"; open: boolean }
+  | { type: "ADD_CUT"; cut: TimelineCut }
+  | { type: "UPDATE_CUT"; id: string; changes: Partial<TimelineCut> }
+  | { type: "REMOVE_CUT"; id: string }
+  | { type: "SET_CUTS"; cuts: TimelineCut[] }
+  | { type: "SET_FILTERS"; changes: Partial<VideoFilterSettings> }
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET_PROJECT" }
@@ -99,6 +113,8 @@ type Action =
       blurRegions: BlurRegion[];
       textRegions: TextRegion[];
       imageOverlays: ImageOverlay[];
+      cuts?: TimelineCut[];
+      filters?: VideoFilterSettings;
     };
 
 const INITIAL_STATE: EditorState = {
@@ -119,6 +135,9 @@ const INITIAL_STATE: EditorState = {
   selectedTextId: null,
   imageOverlays: [],
   selectedImageOverlayId: null,
+  cuts: [],
+  filters: DEFAULT_FILTER_SETTINGS,
+  isUploadModalOpen: false,
   history: { past: [], future: [] },
   projectClipId: null,
 };
@@ -330,6 +349,27 @@ const editorReducer = (state: EditorState, action: Action): EditorState => {
     case "SELECT_IMAGE_OVERLAY":
       return { ...state, selectedImageOverlayId: action.id };
 
+    case "SET_UPLOAD_MODAL_OPEN":
+      return { ...state, isUploadModalOpen: action.open };
+
+    case "ADD_CUT":
+      return { ...state, cuts: [...state.cuts, action.cut] };
+
+    case "UPDATE_CUT":
+      return {
+        ...state,
+        cuts: state.cuts.map((cut) => (cut.id === action.id ? { ...cut, ...action.changes } : cut)),
+      };
+
+    case "REMOVE_CUT":
+      return { ...state, cuts: state.cuts.filter((cut) => cut.id !== action.id) };
+
+    case "SET_CUTS":
+      return { ...state, cuts: action.cuts };
+
+    case "SET_FILTERS":
+      return { ...state, filters: { ...state.filters, ...action.changes } };
+
     case "UNDO": {
       const previous = state.history.past.at(-1);
       if (!previous) return state;
@@ -367,6 +407,8 @@ const editorReducer = (state: EditorState, action: Action): EditorState => {
         blurRegions: action.blurRegions,
         textRegions: action.textRegions,
         imageOverlays: action.imageOverlays,
+        cuts: action.cuts ?? [],
+        filters: action.filters ?? DEFAULT_FILTER_SETTINGS,
         projectClipId: action.clipId,
       };
 
@@ -389,6 +431,10 @@ interface EditorContextValue {
   activeBlurRegions: BlurRegion[];
   activeTextRegions: TextRegion[];
   activeImageOverlays: ImageOverlay[];
+  /** The CSS `filter` value driving the live brightness/contrast/saturation preview. */
+  cssFilter: string;
+  /** Total seconds removed from playback by `cut`-type cuts (for the Review page's summary). */
+  totalCutSeconds: number;
 
   addClip: (clip: TimelineClip) => void;
   removeClip: (id: string) => void;
@@ -427,6 +473,13 @@ interface EditorContextValue {
   updateImageOverlay: (id: string, changes: Partial<ImageOverlay>) => void;
   removeImageOverlay: (id: string) => void;
   selectImageOverlay: (id: string | null) => void;
+  openUploadModal: () => void;
+  closeUploadModal: () => void;
+  addCut: (cut: Omit<TimelineCut, "id">) => void;
+  updateCut: (id: string, changes: Partial<TimelineCut>) => void;
+  removeCut: (id: string) => void;
+  setCuts: (cuts: TimelineCut[]) => void;
+  setFilters: (changes: Partial<VideoFilterSettings>) => void;
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
@@ -437,6 +490,8 @@ interface EditorContextValue {
     blurRegions: BlurRegion[];
     textRegions: TextRegion[];
     imageOverlays: ImageOverlay[];
+    cuts?: TimelineCut[];
+    filters?: VideoFilterSettings;
   }) => void;
 }
 
@@ -577,6 +632,16 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
   );
   const removeImageOverlay = useCallback((id: string) => dispatch({ type: "REMOVE_IMAGE_OVERLAY", id }), []);
   const selectImageOverlay = useCallback((id: string | null) => dispatch({ type: "SELECT_IMAGE_OVERLAY", id }), []);
+  const openUploadModal = useCallback(() => dispatch({ type: "SET_UPLOAD_MODAL_OPEN", open: true }), []);
+  const closeUploadModal = useCallback(() => dispatch({ type: "SET_UPLOAD_MODAL_OPEN", open: false }), []);
+  const addCut = useCallback(
+    (cut: Omit<TimelineCut, "id">) => dispatch({ type: "ADD_CUT", cut: { ...cut, id: crypto.randomUUID() } }),
+    [],
+  );
+  const updateCut = useCallback((id: string, changes: Partial<TimelineCut>) => dispatch({ type: "UPDATE_CUT", id, changes }), []);
+  const removeCut = useCallback((id: string) => dispatch({ type: "REMOVE_CUT", id }), []);
+  const setCuts = useCallback((cuts: TimelineCut[]) => dispatch({ type: "SET_CUTS", cuts }), []);
+  const setFilters = useCallback((changes: Partial<VideoFilterSettings>) => dispatch({ type: "SET_FILTERS", changes }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
@@ -588,6 +653,8 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       blurRegions: BlurRegion[];
       textRegions: TextRegion[];
       imageOverlays: ImageOverlay[];
+      cuts?: TimelineCut[];
+      filters?: VideoFilterSettings;
     }) => dispatch({ type: "LOAD_PROJECT", ...payload }),
     [],
   );
@@ -618,6 +685,14 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
     () => state.imageOverlays.filter((overlay) => state.currentTime >= overlay.startTime && state.currentTime < overlay.endTime),
     [state.imageOverlays, state.currentTime],
   );
+  const cssFilter = useMemo(() => cssFilterString(state.filters), [state.filters]);
+  const totalCutSeconds = useMemo(
+    () =>
+      state.cuts
+        .filter((cut) => cut.type === "cut")
+        .reduce((total, cut) => total + Math.max(0, cut.endTime - cut.startTime), 0),
+    [state.cuts],
+  );
 
   const value = useMemo<EditorContextValue>(
     () => ({
@@ -632,6 +707,8 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       activeBlurRegions,
       activeTextRegions,
       activeImageOverlays,
+      cssFilter,
+      totalCutSeconds,
       addClip,
       removeClip,
       updateClip,
@@ -669,6 +746,13 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       updateImageOverlay,
       removeImageOverlay,
       selectImageOverlay,
+      openUploadModal,
+      closeUploadModal,
+      addCut,
+      updateCut,
+      removeCut,
+      setCuts,
+      setFilters,
       undo,
       redo,
       resetProject,
@@ -684,6 +768,8 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       activeBlurRegions,
       activeTextRegions,
       activeImageOverlays,
+      cssFilter,
+      totalCutSeconds,
       addClip,
       removeClip,
       updateClip,
@@ -721,6 +807,13 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       updateImageOverlay,
       removeImageOverlay,
       selectImageOverlay,
+      openUploadModal,
+      closeUploadModal,
+      addCut,
+      updateCut,
+      removeCut,
+      setCuts,
+      setFilters,
       undo,
       redo,
       resetProject,

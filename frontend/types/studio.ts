@@ -5,6 +5,7 @@ export type StudioTool =
   | "auto-edit"
   | "media"
   | "audio"
+  | "cuts"
   | "blur"
   | "text"
   | "elements"
