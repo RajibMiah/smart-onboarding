@@ -666,6 +666,48 @@ export interface PlaylistWritePayload {
   visibility?: "public" | "private";
 }
 
+export interface ApiStepGuide {
+  id: string;
+  clip: string;
+  step_number: number;
+  timestamp_seconds: string;
+  title: string;
+  description_markdown: string;
+  snapshot_image_url: string;
+  created_at: string;
+}
+
+/** A clip as it plays inside the Playlist Theater — `ApiClip` plus its full
+ *  non-destructive edit tracks and step guides, all in one nested payload. */
+export interface ApiTheaterClip extends ApiClip {
+  tracks: ApiTimelineTrack[];
+  step_guides: ApiStepGuide[];
+  author_name: string;
+}
+
+export interface ApiPlaylistTheaterItem {
+  id: string;
+  clip: ApiTheaterClip;
+  position: number;
+}
+
+export interface ApiPlaylistTheater {
+  id: string;
+  organization: string;
+  owner: string;
+  owner_name: string;
+  /** Derived from whichever team the playlist's owner belongs to — the
+   *  Playlist model itself has no department/team of its own. */
+  owner_department: string | null;
+  owner_team: string | null;
+  title: string;
+  description: string;
+  visibility: "public" | "private";
+  items: ApiPlaylistTheaterItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 export const playlistsApi = {
   list: (params: Record<string, string> = {}) =>
     request<Paginated<ApiPlaylist>>(`/playlists/?${new URLSearchParams(params).toString()}`),
@@ -674,6 +716,12 @@ export const playlistsApi = {
   update: (id: string, payload: Partial<PlaylistWritePayload>) =>
     request<ApiPlaylist>(`/playlists/${id}/`, { method: "PATCH", body: payload }),
   remove: (id: string) => request<void>(`/playlists/${id}/`, { method: "DELETE" }),
+  theater: (id: string) => request<ApiPlaylistTheater>(`/playlists/${id}/theater/`),
+  reorder: (id: string, orderedClipIds: string[]) =>
+    request<ApiPlaylistTheater>(`/playlists/${id}/reorder/`, {
+      method: "PUT",
+      body: { ordered_clip_ids: orderedClipIds },
+    }),
 };
 
 export const playlistItemsApi = {

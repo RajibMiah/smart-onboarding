@@ -190,7 +190,7 @@ const PlaylistStackCard = ({ item }: { item: ContinuingItem }) => {
           </div>
         }
       />
-      <EditorialCard.Footer label="▲ Open Playlist" href={`/library/playlists/${item.id}`} />
+      <EditorialCard.Footer label="▲ Open Playlist" href={`/library/playlists/${item.id}/theater`} />
     </EditorialCard>
   );
 };

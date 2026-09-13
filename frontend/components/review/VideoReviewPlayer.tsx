@@ -8,10 +8,15 @@ import type { ProjectMetadataPayload } from "@/types/project";
 export interface VideoReviewPlayerHandle {
   /** Exposed to `AppliedEditsSummary` so clicking an edit jumps the preview straight to it. */
   seekTo: (timestamp: number) => void;
+  /** Escape hatch for callers that need native controls this handle doesn't
+   *  wrap directly — e.g. the Theater's playback-speed selector and ±5s jump. */
+  getElement: () => HTMLVideoElement | null;
 }
 
 interface VideoReviewPlayerProps {
   project: ProjectMetadataPayload;
+  /** Fires when the underlying <video> reaches its end — drives the Theater's auto-advance. */
+  onEnded?: () => void;
 }
 
 /**
@@ -22,11 +27,11 @@ interface VideoReviewPlayerProps {
  * non-destructively. No transcoding, no server round-trip, no re-render of
  * the source media itself.
  */
-export const VideoReviewPlayer = forwardRef<VideoReviewPlayerHandle, VideoReviewPlayerProps>(({ project }, ref) => {
+export const VideoReviewPlayer = forwardRef<VideoReviewPlayerHandle, VideoReviewPlayerProps>(({ project, onEnded }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { currentTime, zoomTransform, seekTo } = useVideoSyncEngine(videoRef, project);
 
-  useImperativeHandle(ref, () => ({ seekTo }), [seekTo]);
+  useImperativeHandle(ref, () => ({ seekTo, getElement: () => videoRef.current }), [seekTo]);
 
   const activeBlurRegions = project.blurRegions.filter(
     (region) => currentTime >= region.startTime && currentTime <= region.endTime,
@@ -46,6 +51,7 @@ export const VideoReviewPlayer = forwardRef<VideoReviewPlayerHandle, VideoReview
         src={project.primaryMediaUrl}
         controls
         crossOrigin="anonymous"
+        onEnded={onEnded}
         className="h-full w-full origin-center object-contain duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform"
         style={{
           filter: `brightness(${project.filters.brightness}%) contrast(${project.filters.contrast}%) saturate(${project.filters.saturation}%)`,

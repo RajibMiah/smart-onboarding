@@ -20,7 +20,7 @@ interface PlaylistListItemProps {
   onShare?: () => void;
 }
 
-/** Clickable row -> `/library/playlists/[id]`; the action menu stops propagation so it doesn't also navigate. */
+/** Clickable row -> `/library/playlists/[id]/theater`; the action menu stops propagation so it doesn't also navigate. */
 export const PlaylistListItem = ({
   playlist,
   firstThumbnailUrl,
@@ -35,7 +35,7 @@ export const PlaylistListItem = ({
   const router = useRouter();
 
   const navigate = () => {
-    router.push(`/library/playlists/${playlist.id}`);
+    router.push(`/library/playlists/${playlist.id}/theater`);
   };
 
   return (

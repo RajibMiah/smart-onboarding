@@ -15,7 +15,7 @@ export const SharedFeedCard = ({ item }: SharedFeedCardProps) => {
 
   const open = () => {
     if (item.contentType === "clip") router.push(`/studio?clip=${item.objectId}`);
-    else router.push(`/library/playlists/${item.objectId}`);
+    else router.push(`/library/playlists/${item.objectId}/theater`);
   };
 
   return (

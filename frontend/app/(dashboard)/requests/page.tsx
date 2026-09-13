@@ -98,7 +98,7 @@ const RequestsPage = () => {
     if (request.contentType === "clip") {
       router.push(`/studio?clip=${request.objectId}`);
     } else {
-      router.push(`/library/playlists/${request.objectId}`);
+      router.push(`/library/playlists/${request.objectId}/theater`);
     }
   };
 
