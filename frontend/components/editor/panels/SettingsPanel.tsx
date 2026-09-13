@@ -19,7 +19,7 @@ const CANVAS_COLORS = ["#000000", "#FFFFFF", "#FACC15"];
 const EXPORT_PRESETS = ["1080p · High quality", "720p · Balanced", "480p · Small file"];
 
 /** Aspect ratio genuinely reshapes the preview stage; background color and export are honest stubs. */
-export function SettingsPanel({ onNotify }: SettingsPanelProps) {
+export const SettingsPanel = ({ onNotify }: SettingsPanelProps) => {
   const { state, setCanvasAspectRatio } = useEditor();
 
   return (
@@ -79,4 +79,4 @@ export function SettingsPanel({ onNotify }: SettingsPanelProps) {
       </div>
     </div>
   );
-}
+};

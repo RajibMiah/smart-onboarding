@@ -85,7 +85,7 @@ const BRANDING_OPTIONS = ["Default", "APC Branded", "No Branding"];
  * `useAutoEditWorkflow`. "Apply Workflow" is a timed stub: there's no AI
  * backend yet, so it reports back via `onNotify` like the other panels.
  */
-export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
+export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
   const { videoClips } = useEditor();
   const {
     config,
@@ -351,9 +351,9 @@ export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
       </div>
     </div>
   );
-}
+};
 
-function EditorialAccordion({
+const EditorialAccordion = ({
   icon: Icon,
   title,
   description,
@@ -368,7 +368,7 @@ function EditorialAccordion({
   summary?: ReactNode;
   defaultOpen?: boolean;
   children: ReactNode;
-}) {
+}) => {
   const [open, setOpen] = useState(defaultOpen);
   const contentId = useId();
 
@@ -406,9 +406,9 @@ function EditorialAccordion({
       </div>
     </div>
   );
-}
+};
 
-function FlyoutCard({
+const FlyoutCard = ({
   icon: Icon,
   title,
   description,
@@ -420,7 +420,7 @@ function FlyoutCard({
   description: string;
   onClick: () => void;
   children: ReactNode;
-}) {
+}) => {
   return (
     <button type="button" onClick={onClick} className="flex flex-col gap-2.5 border-2 border-black p-3 text-left transition hover:bg-neutral-100">
       <div className="flex items-center gap-3">
@@ -436,9 +436,9 @@ function FlyoutCard({
       {children}
     </button>
   );
-}
+};
 
-function RadioCard({
+const RadioCard = ({
   selected,
   title,
   description,
@@ -450,7 +450,7 @@ function RadioCard({
   description: string;
   onSelect: () => void;
   compact?: boolean;
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -475,9 +475,9 @@ function RadioCard({
       </span>
     </button>
   );
-}
+};
 
-function CheckboxCard({
+const CheckboxCard = ({
   checked,
   title,
   description,
@@ -487,7 +487,7 @@ function CheckboxCard({
   title: string;
   description: string;
   onChange: (checked: boolean) => void;
-}) {
+}) => {
   return (
     <label
       className={cn(
@@ -507,9 +507,9 @@ function CheckboxCard({
       </span>
     </label>
   );
-}
+};
 
-function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+const ToggleSwitch = ({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) => {
   return (
     <button
       type="button"
@@ -527,8 +527,8 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
       />
     </button>
   );
-}
+};
 
-function Badge({ children }: { children: ReactNode }) {
+const Badge = ({ children }: { children: ReactNode }) => {
   return <span className="border border-black bg-neutral-100 px-2 py-1 text-[11px] font-medium text-black">{children}</span>;
-}
+};

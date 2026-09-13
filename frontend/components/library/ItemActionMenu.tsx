@@ -21,7 +21,7 @@ interface ItemActionMenuProps {
 }
 
 /** "···" row-actions dropdown — outside-click and Escape both close it. Item set is caller-defined (clips/pages/playlists each need a different list). */
-export function ItemActionMenu({ itemLabel, items }: ItemActionMenuProps) {
+export const ItemActionMenu = ({ itemLabel, items }: ItemActionMenuProps) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -29,19 +29,19 @@ export function ItemActionMenu({ itemLabel, items }: ItemActionMenuProps) {
 
   useEffect(() => {
     if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  function runAndClose(action?: () => void) {
+  const runAndClose = (action?: () => void) => {
     return () => {
       setOpen(false);
       action?.();
     };
-  }
+  };
 
   return (
     <div ref={containerRef} className="relative">
@@ -75,9 +75,9 @@ export function ItemActionMenu({ itemLabel, items }: ItemActionMenuProps) {
       )}
     </div>
   );
-}
+};
 
-function MenuItem({
+const MenuItem = ({
   icon: Icon,
   label,
   onClick,
@@ -87,7 +87,7 @@ function MenuItem({
   label: string;
   onClick: () => void;
   tone?: "default" | "danger";
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -102,4 +102,4 @@ function MenuItem({
       {label}
     </button>
   );
-}
+};

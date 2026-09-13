@@ -13,7 +13,7 @@ interface UsePlaylistFilterOptions {
 }
 
 /** Client-side search (debounced), visibility filtering, and sorting for the Playlists library. */
-export function usePlaylistFilter({ playlists, initialSort = "updated", initialVisibility = "all" }: UsePlaylistFilterOptions) {
+export const usePlaylistFilter = ({ playlists, initialSort = "updated", initialVisibility = "all" }: UsePlaylistFilterOptions) => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [visibility, setVisibility] = useState<PlaylistVisibilityFilter>(initialVisibility);
@@ -52,4 +52,4 @@ export function usePlaylistFilter({ playlists, initialSort = "updated", initialV
     items,
     totalCount: playlists.length,
   };
-}
+};

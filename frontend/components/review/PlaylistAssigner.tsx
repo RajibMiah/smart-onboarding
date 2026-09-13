@@ -16,24 +16,24 @@ interface PlaylistAssignerProps {
 }
 
 /** Mandatory playlist selection — the only gate `handleSaveAndFinish` actually enforces. */
-export function PlaylistAssigner({ playlists, selectedPlaylistId, onSelect, onCreate, error }: PlaylistAssignerProps) {
+export const PlaylistAssigner = ({ playlists, selectedPlaylistId, onSelect, onCreate, error }: PlaylistAssignerProps) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState("");
 
-  function handleSelectChange(value: string) {
+  const handleSelectChange = (value: string) => {
     if (value === CREATE_NEW_VALUE) {
       setIsCreating(true);
       return;
     }
     onSelect(value);
-  }
+  };
 
-  function handleCreateSubmit() {
+  const handleCreateSubmit = () => {
     if (!newName.trim()) return;
     onCreate(newName);
     setNewName("");
     setIsCreating(false);
-  }
+  };
 
   return (
     <div className={error ? "border border-red-600 p-4" : "border border-black p-4"}>
@@ -89,4 +89,4 @@ export function PlaylistAssigner({ playlists, selectedPlaylistId, onSelect, onCr
       )}
     </div>
   );
-}
+};

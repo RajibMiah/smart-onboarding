@@ -19,7 +19,7 @@ interface UseTimelinePlaybackResult {
  * deleting a middle clip), a `requestAnimationFrame` loop advances the
  * playhead instead, since there's no `<video>` to drive it.
  */
-export function useTimelinePlayback(): UseTimelinePlaybackResult {
+export const useTimelinePlayback = (): UseTimelinePlaybackResult => {
   const { videoClips, state, totalDuration, seek, pause } = useEditor();
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastSrcRef = useRef<string | null>(null);
@@ -81,13 +81,13 @@ export function useTimelinePlayback(): UseTimelinePlaybackResult {
     const video = videoRef.current;
     if (!video || !activeClip) return;
 
-    function onTimeUpdate() {
+    const onTimeUpdate = () => {
       if (!video || !activeClip) return;
       seek(activeClip.startOffset + (video.currentTime - activeClip.trimStart));
-    }
-    function onEnded() {
+    };
+    const onEnded = () => {
       pause();
-    }
+    };
 
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("ended", onEnded);
@@ -122,4 +122,4 @@ export function useTimelinePlayback(): UseTimelinePlaybackResult {
   }, [state.isPlaying, activeClip, totalDuration, seek, pause]);
 
   return { videoRef, activeClip };
-}
+};

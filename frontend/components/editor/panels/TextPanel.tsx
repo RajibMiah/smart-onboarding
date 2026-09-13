@@ -60,7 +60,7 @@ const ALIGN_OPTIONS: { id: TextRegion["style"]["textAlign"]; icon: typeof AlignL
  * position (no marquee draw, unlike zoom/blur — matches how a lower-third
  * or title card is normally just dropped in and then repositioned).
  */
-export function TextPanel({ onNotify }: TextPanelProps) {
+export const TextPanel = ({ onNotify }: TextPanelProps) => {
   const { videoClips, state, addTextRegion, updateTextRegion, removeTextRegion, selectTextRegion } = useEditor();
   const [selectedPreset, setSelectedPreset] = useState<PresetId>("lower-third");
   const hasMedia = videoClips.length > 0;
@@ -215,4 +215,4 @@ export function TextPanel({ onNotify }: TextPanelProps) {
       )}
     </div>
   );
-}
+};

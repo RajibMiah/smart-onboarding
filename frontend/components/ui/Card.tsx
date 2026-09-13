@@ -3,7 +3,7 @@ import type { ComponentPropsWithoutRef } from "react";
 import { cn } from "@/lib/utils";
 
 /** Compound `Card` — `<Card><Card.Header/><Card.Body/><Card.Footer/></Card>`. */
-function Card({ className, children, ...props }: ComponentPropsWithoutRef<"div">) {
+const Card = ({ className, children, ...props }: ComponentPropsWithoutRef<"div">) => {
   return (
     <div
       className={cn(
@@ -15,9 +15,9 @@ function Card({ className, children, ...props }: ComponentPropsWithoutRef<"div">
       {children}
     </div>
   );
-}
+};
 
-function CardHeader({ className, children, ...props }: ComponentPropsWithoutRef<"div">) {
+const CardHeader = ({ className, children, ...props }: ComponentPropsWithoutRef<"div">) => {
   return (
     <div
       className={cn("flex items-center justify-between gap-3 px-4 pt-4", className ?? "")}
@@ -26,17 +26,17 @@ function CardHeader({ className, children, ...props }: ComponentPropsWithoutRef<
       {children}
     </div>
   );
-}
+};
 
-function CardBody({ className, children, ...props }: ComponentPropsWithoutRef<"div">) {
+const CardBody = ({ className, children, ...props }: ComponentPropsWithoutRef<"div">) => {
   return (
     <div className={cn("p-4", className ?? "")} {...props}>
       {children}
     </div>
   );
-}
+};
 
-function CardFooter({ className, children, ...props }: ComponentPropsWithoutRef<"div">) {
+const CardFooter = ({ className, children, ...props }: ComponentPropsWithoutRef<"div">) => {
   return (
     <div
       className={cn("flex items-center gap-2 border-t-2 border-black px-4 py-3", className ?? "")}
@@ -45,7 +45,7 @@ function CardFooter({ className, children, ...props }: ComponentPropsWithoutRef<
       {children}
     </div>
   );
-}
+};
 
 Card.Header = CardHeader;
 Card.Body = CardBody;

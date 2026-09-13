@@ -11,21 +11,21 @@ interface TimeRange {
  * move/trim the same way, unlike `TimelineClip` (which also has source
  * trim in/out points), so those keep their own `beginClipDrag`.
  */
-export function beginTimeRangeDrag<T extends TimeRange>(
+export const beginTimeRangeDrag = <T extends TimeRange>(
   event: React.PointerEvent,
   original: T,
   mode: TimeRangeDragMode,
   zoomLevel: number,
   minDuration: number,
   onChange: (changes: Partial<TimeRange>) => void,
-) {
+) => {
   event.stopPropagation();
   event.preventDefault();
 
   const startClientX = event.clientX;
   const duration = original.endTime - original.startTime;
 
-  function onMove(ev: PointerEvent) {
+  const onMove = (ev: PointerEvent) => {
     const deltaSeconds = (ev.clientX - startClientX) / zoomLevel;
 
     if (mode === "move") {
@@ -43,13 +43,13 @@ export function beginTimeRangeDrag<T extends TimeRange>(
     // trim-end
     const newEnd = Math.max(original.endTime + deltaSeconds, original.startTime + minDuration);
     onChange({ endTime: newEnd });
-  }
+  };
 
-  function onUp() {
+  const onUp = () => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
-  }
+  };
 
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
-}
+};

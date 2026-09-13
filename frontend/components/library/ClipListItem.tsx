@@ -17,13 +17,13 @@ interface ClipListItemProps {
   onDelete?: () => void;
 }
 
-export function ClipListItem({ clip, onRename, onMoveToProject, onDuplicate, onDelete }: ClipListItemProps) {
+export const ClipListItem = ({ clip, onRename, onMoveToProject, onDuplicate, onDelete }: ClipListItemProps) => {
   const router = useRouter();
   const href = `/studio?clip=${clip.id}`;
 
-  function navigate() {
+  const navigate = () => {
     router.push(href);
-  }
+  };
 
   return (
     <div
@@ -82,4 +82,4 @@ export function ClipListItem({ clip, onRename, onMoveToProject, onDuplicate, onD
       </EditorialCard>
     </div>
   );
-}
+};

@@ -106,18 +106,18 @@ async function loadSharedFFmpeg(): Promise<FFmpeg> {
 }
 
 /** Runs `task` after every previously queued ffmpeg operation has settled. */
-function enqueue<T>(task: () => Promise<T>): Promise<T> {
+const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
   const result = operationQueue.then(task, task);
   // Swallow rejections here so one failed op doesn't wedge the queue for
   // the next caller — the real error still reaches this call's own awaiter.
   operationQueue = result.catch(() => undefined);
   return result;
-}
+};
 
-function toBlob(data: Awaited<ReturnType<FFmpeg["readFile"]>>, mimeType: string): Blob {
+const toBlob = (data: Awaited<ReturnType<FFmpeg["readFile"]>>, mimeType: string): Blob => {
   const bytes = data as Uint8Array;
   return new Blob([new Uint8Array(bytes).buffer], { type: mimeType });
-}
+};
 
 const CONTAINER_MIME: Record<string, string> = {
   webm: "video/webm",
@@ -125,7 +125,7 @@ const CONTAINER_MIME: Record<string, string> = {
   mov: "video/quicktime",
 };
 
-export function useFFmpegWasm(): UseFFmpegWasmResult {
+export const useFFmpegWasm = (): UseFFmpegWasmResult => {
   const [isLoaded, setIsLoaded] = useState(() => sharedFFmpeg?.loaded ?? false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -253,4 +253,4 @@ export function useFFmpegWasm(): UseFFmpegWasmResult {
     trimClip,
     extractAudio,
   };
-}
+};

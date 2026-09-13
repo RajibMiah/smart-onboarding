@@ -20,7 +20,7 @@ interface PlaylistListItemProps {
 }
 
 /** Clickable row -> `/library/playlists/[id]`; the action menu stops propagation so it doesn't also navigate. */
-export function PlaylistListItem({
+export const PlaylistListItem = ({
   playlist,
   firstThumbnailUrl,
   totalDurationSeconds,
@@ -29,12 +29,12 @@ export function PlaylistListItem({
   onChangeVisibility,
   onDuplicate,
   onDelete,
-}: PlaylistListItemProps) {
+}: PlaylistListItemProps) => {
   const router = useRouter();
 
-  function navigate() {
+  const navigate = () => {
     router.push(`/library/playlists/${playlist.id}`);
-  }
+  };
 
   return (
     <div
@@ -104,4 +104,4 @@ export function PlaylistListItem({
       </div>
     </div>
   );
-}
+};

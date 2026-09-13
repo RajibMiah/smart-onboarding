@@ -24,8 +24,8 @@ const CREATE_MENU_OPTIONS: CreateMenuOption[] = [
 ];
 
 /** Sharp-edged top bar — solid black bottom rule, black/yellow action cluster. */
-export function TopNav() {
-  const { user, avatarUrl } = useUI();
+export const TopNav = () => {
+  const { user, avatarUrl, logout } = useUI();
   const toast = useToast();
 
   return (
@@ -39,15 +39,21 @@ export function TopNav() {
         <UserMenuDropdown
           user={user}
           avatarUrl={avatarUrl}
-          onStubAction={(label) => toast.show(`${label} isn't available in this preview yet.`)}
+          onStubAction={(label) => {
+            if (label === "Logout") {
+              void logout();
+              return;
+            }
+            toast.show(`${label} isn't available in this preview yet.`);
+          }}
         />
       </div>
       {toast.message && <Toast message={toast.message} />}
     </header>
   );
-}
+};
 
-function MobileMenuButton() {
+const MobileMenuButton = () => {
   const { openMobileSidebar } = useUI();
   return (
     <button
@@ -59,9 +65,9 @@ function MobileMenuButton() {
       <Menu className="h-5 w-5" />
     </button>
   );
-}
+};
 
-function Logo() {
+const Logo = () => {
   return (
     <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold text-black">
       <span className="flex h-7 w-7 items-center justify-center border-2 border-black bg-black text-xs font-bold text-white">
@@ -70,20 +76,20 @@ function Logo() {
       <span className="hidden text-lg font-black tracking-tight sm:inline">AI Paper Clip</span>
     </Link>
   );
-}
+};
 
-function SearchBar() {
+const SearchBar = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ⌘K / Ctrl+K focuses the search field from anywhere in the app.
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
+    const onKeyDown = (event: KeyboardEvent) => {
       const isShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
       if (isShortcut) {
         event.preventDefault();
         inputRef.current?.focus();
       }
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
@@ -102,9 +108,9 @@ function SearchBar() {
       </kbd>
     </div>
   );
-}
+};
 
-function CreateSplitButton() {
+const CreateSplitButton = () => {
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,9 +164,9 @@ function CreateSplitButton() {
       )}
     </div>
   );
-}
+};
 
-function NotificationButton() {
+const NotificationButton = () => {
   return (
     <button
       type="button"
@@ -171,4 +177,4 @@ function NotificationButton() {
       <span className="absolute right-1.5 top-1.5 h-2 w-2 border border-black bg-brand-yellow" />
     </button>
   );
-}
+};

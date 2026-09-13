@@ -7,7 +7,7 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { useAuthForm } from "@/hooks/useAuthForm";
 import type { PasswordResetRequest } from "@/types/auth";
 
-export default function ResetPasswordPage() {
+const ResetPasswordPage = () => {
   const [sent, setSent] = useState(false);
 
   const { values, errors, isSubmitting, submitError, setField, handleSubmit } = useAuthForm<PasswordResetRequest>({
@@ -74,4 +74,5 @@ export default function ResetPasswordPage() {
       )}
     </AuthCard>
   );
-}
+};
+export default ResetPasswordPage;

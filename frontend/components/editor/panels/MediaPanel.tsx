@@ -24,7 +24,7 @@ interface MediaPanelProps {
 
 type DrawerTab = "timeline" | "previous";
 
-export function MediaPanel({
+export const MediaPanel = ({
   isRecording,
   recordingSource,
   onStartScreenRecording,
@@ -32,7 +32,7 @@ export function MediaPanel({
   onStopRecording,
   onUploadFiles,
   onTurnSlides,
-}: MediaPanelProps) {
+}: MediaPanelProps) => {
   const {
     videoClips,
     state: { mediaBin },
@@ -49,10 +49,10 @@ export function MediaPanel({
 
   useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.length) onUploadFiles(event.target.files);
     event.target.value = "";
-  }
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -147,9 +147,9 @@ export function MediaPanel({
       </div>
     </div>
   );
-}
+};
 
-function QuickActionButton({
+const QuickActionButton = ({
   icon: Icon,
   label,
   onClick,
@@ -159,7 +159,7 @@ function QuickActionButton({
   label: string;
   onClick: () => void;
   active?: boolean;
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -173,9 +173,9 @@ function QuickActionButton({
       <span className="leading-tight">{label}</span>
     </button>
   );
-}
+};
 
-function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+const TabButton = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => {
   return (
     <button
       type="button"
@@ -188,18 +188,18 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
       {label}
     </button>
   );
-}
+};
 
-function EmptyState({ message }: { message: string }) {
+const EmptyState = ({ message }: { message: string }) => {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 border-2 border-dashed border-black p-6 text-center">
       <FolderOpen className="h-6 w-6 text-neutral-400" />
       <p className="text-xs text-neutral-500">{message}</p>
     </div>
   );
-}
+};
 
-function TimelineClipTile({
+const TimelineClipTile = ({
   clip,
   selected,
   onSelect,
@@ -209,7 +209,7 @@ function TimelineClipTile({
   selected: boolean;
   onSelect: () => void;
   onRemove: () => void;
-}) {
+}) => {
   return (
     <div
       onClick={onSelect}
@@ -246,9 +246,9 @@ function TimelineClipTile({
       </button>
     </div>
   );
-}
+};
 
-function BinAssetTile({ asset, onAdd }: { asset: MediaAsset; onAdd: () => void }) {
+const BinAssetTile = ({ asset, onAdd }: { asset: MediaAsset; onAdd: () => void }) => {
   return (
     <button
       type="button"
@@ -271,4 +271,4 @@ function BinAssetTile({ asset, onAdd }: { asset: MediaAsset; onAdd: () => void }
       <span className="min-w-0 flex-1 truncate text-xs font-medium text-black">{asset.name}</span>
     </button>
   );
-}
+};

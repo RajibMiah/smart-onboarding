@@ -17,7 +17,7 @@ const SIZE_CLASSES: Record<NonNullable<AvatarProps["size"]>, string> = {
 };
 
 /** Circular initials avatar with a gradient fill — no external image dependency. */
-export function Avatar({ initials, gradient = "from-slate-600 to-slate-800", size = "md", fill = false, className }: AvatarProps) {
+export const Avatar = ({ initials, gradient = "from-slate-600 to-slate-800", size = "md", fill = false, className }: AvatarProps) => {
   return (
     <div
       className={cn(
@@ -31,4 +31,4 @@ export function Avatar({ initials, gradient = "from-slate-600 to-slate-800", siz
       {initials}
     </div>
   );
-}
+};

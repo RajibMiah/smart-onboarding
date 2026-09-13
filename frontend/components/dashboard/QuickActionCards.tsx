@@ -16,7 +16,7 @@ interface QuickAction {
   onSelect?: () => void;
 }
 
-function useQuickActions(): QuickAction[] {
+const useQuickActions = (): QuickAction[] => {
   const router = useRouter();
   const uploadModal = useModal(UPLOAD_MODAL_ID);
 
@@ -50,9 +50,9 @@ function useQuickActions(): QuickAction[] {
       onSelect: () => router.push("/studio"),
     },
   ];
-}
+};
 
-export function QuickActionCards() {
+export const QuickActionCards = () => {
   const actions = useQuickActions();
 
   return (
@@ -79,4 +79,4 @@ export function QuickActionCards() {
       ))}
     </div>
   );
-}
+};

@@ -13,7 +13,7 @@ interface BlurTimelineTrackProps {
 }
 
 /** Timeline lane for blur regions — same move/trim mechanics as the zoom lane. */
-export function BlurTimelineTrack({ laneHeight, onLaneScrub }: BlurTimelineTrackProps) {
+export const BlurTimelineTrack = ({ laneHeight, onLaneScrub }: BlurTimelineTrackProps) => {
   const { state, updateBlurRegion, selectBlurRegion } = useEditor();
 
   return (
@@ -22,12 +22,12 @@ export function BlurTimelineTrack({ laneHeight, onLaneScrub }: BlurTimelineTrack
         const left = region.startTime * state.zoomLevel;
         const width = Math.max(4, (region.endTime - region.startTime) * state.zoomLevel);
 
-        function onDragStart(event: React.PointerEvent, mode: TimeRangeDragMode) {
+        const onDragStart = (event: React.PointerEvent, mode: TimeRangeDragMode) => {
           selectBlurRegion(region.id);
           beginTimeRangeDrag(event, region, mode, state.zoomLevel, MIN_BLUR_SECONDS, (changes) =>
             updateBlurRegion(region.id, changes),
           );
-        }
+        };
 
         return (
           <div
@@ -52,4 +52,4 @@ export function BlurTimelineTrack({ laneHeight, onLaneScrub }: BlurTimelineTrack
       })}
     </div>
   );
-}
+};

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 
@@ -10,13 +11,15 @@ import { Toast } from "@/components/ui/Toast";
 import { useAuthForm } from "@/hooks/useAuthForm";
 import { useOtpVerification } from "@/hooks/useOtpVerification";
 import { useToast } from "@/hooks/useToast";
-import type { OtpPayload, WorkspaceRegistration } from "@/types/auth";
+import { authApi, ApiError } from "@/lib/api-client";
+import type { WorkspaceRegistration } from "@/types/auth";
 
 type SignupStep = "email" | "otp";
 
 const OTP_LENGTH = 6;
 
-export default function SignupPage() {
+const SignupPage = () => {
+  const router = useRouter();
   const toast = useToast();
   const otp = useOtpVerification(OTP_LENGTH);
   const [step, setStep] = useState<SignupStep>("email");
@@ -24,26 +27,41 @@ export default function SignupPage() {
   const [isVerifying, setIsVerifying] = useState(false);
 
   const { values, errors, submitError, setField, handleSubmit } = useAuthForm<WorkspaceRegistration>({
-    initialValues: { email: "", acceptedPrivacyPolicy: false },
+    initialValues: { email: "", password: "", organizationName: "", acceptedPrivacyPolicy: false },
     onSubmit: async () => {
       setIsSendingOtp(true);
-      setTimeout(() => {
-        setIsSendingOtp(false);
+      try {
+        // The account is created here for real; the OTP step below is a
+        // client-side confirmation gate (there's no email-delivery backend
+        // yet), so login happens once that gate is cleared.
+        await authApi.register({
+          email: values.email,
+          password: values.password,
+          organization_name: values.organizationName,
+        });
         setStep("otp");
         otp.reset();
         toast.show(`Verification code sent to ${values.email}.`);
-      }, 900);
+      } catch (error) {
+        toast.show(error instanceof ApiError ? error.message : "Couldn't create your workspace — try again.");
+      } finally {
+        setIsSendingOtp(false);
+      }
     },
   });
 
-  function handleVerify() {
+  async function handleVerify() {
     if (!otp.isComplete || isVerifying) return;
-    const payload: OtpPayload = { email: values.email, code: otp.code };
     setIsVerifying(true);
-    setTimeout(() => {
+    try {
+      await authApi.login({ email: values.email, password: values.password });
+      router.push("/");
+    } catch {
+      toast.show("Couldn't sign you in automatically — please log in.");
+      router.push("/login");
+    } finally {
       setIsVerifying(false);
-      toast.show(`Workspace creation for ${payload.email} isn't available in this offline preview yet.`);
-    }, 900);
+    }
   }
 
   return (
@@ -57,36 +75,73 @@ export default function SignupPage() {
           )}
 
           <div>
+            <label htmlFor="signup-org" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Workspace Name *
+            </label>
+            <input
+              id="signup-org"
+              type="text"
+              required
+              placeholder="Acme Onboarding"
+              value={values.organizationName}
+              onChange={(event) => setField("organizationName", event.target.value)}
+              className="w-full border border-black px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+            />
+          </div>
+
+          <div>
             <label htmlFor="signup-email" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
               Email Address *
             </label>
-            <div className="flex gap-2">
-              <input
-                id="signup-email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="user@example.com"
-                value={values.email}
-                onChange={(event) => setField("email", event.target.value)}
-                aria-invalid={!!errors.email}
-                aria-describedby={errors.email ? "signup-email-error" : undefined}
-                className="min-w-0 flex-1 border border-black px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-black"
-              />
-              <button
-                type="submit"
-                disabled={isSendingOtp || !values.acceptedPrivacyPolicy}
-                className="shrink-0 border border-black bg-brand-yellow px-5 py-2 text-sm font-bold text-black transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:border-black/20 disabled:bg-neutral-100 disabled:text-neutral-400"
-              >
-                {isSendingOtp ? "Sending…" : "Send OTP"}
-              </button>
-            </div>
+            <input
+              id="signup-email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="user@example.com"
+              value={values.email}
+              onChange={(event) => setField("email", event.target.value)}
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? "signup-email-error" : undefined}
+              className="w-full border border-black px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+            />
             {errors.email && (
               <p id="signup-email-error" className="mt-1 text-xs text-red-600">
                 {errors.email}
               </p>
             )}
           </div>
+
+          <div>
+            <label htmlFor="signup-password" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Password *
+            </label>
+            <input
+              id="signup-password"
+              type="password"
+              required
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              value={values.password}
+              onChange={(event) => setField("password", event.target.value)}
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? "signup-password-error" : undefined}
+              className="w-full border border-black px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+            />
+            {errors.password && (
+              <p id="signup-password-error" className="mt-1 text-xs text-red-600">
+                {errors.password}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSendingOtp || !values.acceptedPrivacyPolicy || !values.organizationName.trim()}
+            className="w-full border border-black bg-brand-yellow px-5 py-2.5 text-sm font-bold text-black transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:border-black/20 disabled:bg-neutral-100 disabled:text-neutral-400"
+          >
+            {isSendingOtp ? "Creating workspace…" : "Send OTP"}
+          </button>
 
           <label className="flex items-start gap-2 text-xs text-neutral-600">
             <input
@@ -108,6 +163,8 @@ export default function SignupPage() {
             <Link href="/login" className="font-medium text-black underline underline-offset-2">
               Log in
             </Link>
+            {" · "}
+            Got an invitation email? Use the link in it.
           </p>
         </form>
       ) : (
@@ -158,4 +215,5 @@ export default function SignupPage() {
       {toast.message && <Toast message={toast.message} />}
     </AuthCard>
   );
-}
+};
+export default SignupPage;

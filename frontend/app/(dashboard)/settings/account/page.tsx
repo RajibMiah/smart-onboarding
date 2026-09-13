@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bell, ExternalLink, Globe, Home, Info } from "lucide-react";
+import { Bell, ExternalLink, Globe, Home, Info, UserPlus } from "lucide-react";
 
 import { AccountInfoForm } from "@/components/profile/AccountInfoForm";
 import { ProfileAvatarUploader } from "@/components/profile/ProfileAvatarUploader";
@@ -11,6 +11,7 @@ import { Toast } from "@/components/ui/Toast";
 import { useUI } from "@/context/ui-context";
 import { useProfileForm } from "@/hooks/useProfileForm";
 import { useToast } from "@/hooks/useToast";
+import { authApi } from "@/lib/api-client";
 
 const LANGUAGE_OPTIONS = [{ value: "en-US", label: "English (US)" }];
 
@@ -27,8 +28,17 @@ const NOTIFICATION_PREFS: NotificationPref[] = [
   { id: "security-alerts", label: "Security alerts", description: "Sign-ins from a new device or location." },
 ];
 
-export default function AccountSettingsPage() {
-  const { user, avatarUrl, setAvatarUrl } = useUI();
+const AccountSettingsPage = () => {
+  const { apiUser } = useUI();
+  // Keyed by user id so the form's internal state (via useProfileForm) is
+  // seeded fresh once the session user finishes loading, instead of being
+  // stuck with the empty initial values captured before the fetch resolved.
+  return <AccountSettingsForm key={apiUser?.id ?? "loading"} />;
+};
+export default AccountSettingsPage;
+
+const AccountSettingsForm = () => {
+  const { user, apiUser, updateApiUser, avatarUrl, setAvatarUrl } = useUI();
   const toast = useToast();
   const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>({
     "product-updates": true,
@@ -39,19 +49,28 @@ export default function AccountSettingsPage() {
 
   const form = useProfileForm({
     initialValues: {
-      firstName: "Rajib",
-      lastName: "R",
-      location: "my-location",
+      firstName: apiUser?.first_name ?? "",
+      lastName: apiUser?.last_name ?? "",
+      location: apiUser?.location || "my-location",
       department: "my-department",
       team: "my-team",
-      language: "en-US",
+      language: apiUser?.language ?? "en-US",
     },
-    onSave: () => toast.show("Account details saved."),
+    onSave: async (values) => {
+      const updated = await authApi.updateMe({
+        first_name: values.firstName,
+        last_name: values.lastName,
+        location: values.location === "my-location" ? "" : values.location,
+        language: values.language,
+      });
+      updateApiUser(updated);
+      toast.show("Account details saved.");
+    },
   });
 
-  function confirmAndStub(message: string, stubMessage: string) {
+  const confirmAndStub = (message: string, stubMessage: string) => {
     if (window.confirm(message)) toast.show(stubMessage);
-  }
+  };
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 pb-16">
@@ -141,6 +160,18 @@ export default function AccountSettingsPage() {
           </div>
         </SettingsAccordion>
 
+        {(apiUser?.membership?.is_creator || apiUser?.membership?.is_global_admin) && (
+          <Link
+            href="/admin/users"
+            className="flex items-center justify-between gap-3 border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            <span className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" /> Manage Users &amp; Invitations
+            </span>
+            <span className="text-xs text-slate-400">&rarr;</span>
+          </Link>
+        )}
+
         <SettingsAccordion title="Email Notifications" icon={Bell}>
           <div className="flex flex-col gap-4">
             {NOTIFICATION_PREFS.map((pref) => (
@@ -198,9 +229,9 @@ export default function AccountSettingsPage() {
       {toast.message && <Toast message={toast.message} />}
     </div>
   );
-}
+};
 
-function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+const ToggleSwitch = ({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) => {
   return (
     <button
       type="button"
@@ -215,4 +246,4 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
       />
     </button>
   );
-}
+};

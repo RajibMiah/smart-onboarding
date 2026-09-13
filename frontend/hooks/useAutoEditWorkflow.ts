@@ -43,7 +43,7 @@ const APPLY_DURATION_MS = 1200;
  * reports back through `onNotify`, the same "not available in this offline
  * preview yet" convention the other Studio panels use.
  */
-export function useAutoEditWorkflow(initialConfig: AutoEditConfig = DEFAULT_CONFIG) {
+export const useAutoEditWorkflow = (initialConfig: AutoEditConfig = DEFAULT_CONFIG) => {
   const [config, setConfig] = useState<AutoEditConfig>(initialConfig);
   const [isProcessing, setIsProcessing] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,4 +96,4 @@ export function useAutoEditWorkflow(initialConfig: AutoEditConfig = DEFAULT_CONF
     setSilenceSpeedMultiplier,
     applyWorkflow,
   };
-}
+};

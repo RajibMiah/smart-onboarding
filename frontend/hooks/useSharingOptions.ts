@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: SharingOptionsConfig = {
  * "Apply Workflow" submit as everything else on this panel, so unlike
  * `useAutoEditWorkflow` there's no separate apply/loading state here.
  */
-export function useSharingOptions(initialConfig: SharingOptionsConfig = DEFAULT_CONFIG) {
+export const useSharingOptions = (initialConfig: SharingOptionsConfig = DEFAULT_CONFIG) => {
   const [config, setConfig] = useState<SharingOptionsConfig>(initialConfig);
 
   const setField = useCallback(<K extends keyof SharingOptionsConfig>(key: K, value: SharingOptionsConfig[K]) => {
@@ -29,4 +29,4 @@ export function useSharingOptions(initialConfig: SharingOptionsConfig = DEFAULT_
   }, []);
 
   return { config, setField };
-}
+};

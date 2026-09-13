@@ -6,9 +6,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type PasswordStrength = "weak" | "fair" | "strong";
 
-export function isValidEmail(email: string): boolean {
+export const isValidEmail = (email: string): boolean => {
   return EMAIL_REGEX.test(email.trim());
-}
+};
 
 /**
  * Heuristic strength score (length + character variety) for a "create
@@ -16,7 +16,7 @@ export function isValidEmail(email: string): boolean {
  * are login-with-existing-password and OTP-based signup, neither of which
  * collects a new password yet), kept here ready for when one does.
  */
-export function getPasswordStrength(password: string): PasswordStrength {
+export const getPasswordStrength = (password: string): PasswordStrength => {
   if (password.length === 0) return "weak";
   let score = 0;
   if (password.length >= 8) score++;
@@ -26,7 +26,7 @@ export function getPasswordStrength(password: string): PasswordStrength {
   if (score <= 1) return "weak";
   if (score <= 3) return "fair";
   return "strong";
-}
+};
 
 interface UseAuthFormOptions<T extends object> {
   initialValues: T;
@@ -39,7 +39,7 @@ interface UseAuthFormOptions<T extends object> {
  * gets those validated automatically (duck-typed via `in`, so the same hook
  * serves login, signup, and reset-password without a schema per page).
  */
-export function useAuthForm<T extends object>({ initialValues, onSubmit }: UseAuthFormOptions<T>) {
+export const useAuthForm = <T extends object>({ initialValues, onSubmit }: UseAuthFormOptions<T>) => {
   const [values, setValues] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,4 +84,4 @@ export function useAuthForm<T extends object>({ initialValues, onSubmit }: UseAu
   );
 
   return { values, errors, isSubmitting, submitError, setField, handleSubmit };
-}
+};

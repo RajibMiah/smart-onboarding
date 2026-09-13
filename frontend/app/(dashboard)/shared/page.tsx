@@ -2,7 +2,7 @@ import { Share2 } from "lucide-react";
 
 import { ComingSoon } from "@/components/dashboard/ComingSoon";
 
-export default function SharedWithMePage() {
+const SharedWithMePage = () => {
   return (
     <ComingSoon
       icon={Share2}
@@ -10,4 +10,5 @@ export default function SharedWithMePage() {
       description="Content colleagues share with you directly will show up here."
     />
   );
-}
+};
+export default SharedWithMePage;

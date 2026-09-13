@@ -13,14 +13,14 @@ import { useEditor } from "@/context/EditorContext";
 import { useReviewWorkflow } from "@/hooks/useReviewWorkflow";
 import { useToast } from "@/hooks/useToast";
 
-function defaultProjectTitle(): string {
+const defaultProjectTitle = (): string => {
   const now = new Date();
   const date = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const time = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   return `APC on ${date} at ${time}`;
-}
+};
 
-export default function ReviewPage() {
+const ReviewPage = () => {
   const router = useRouter();
   const toast = useToast();
   const { videoClips, totalDuration } = useEditor();
@@ -106,9 +106,10 @@ export default function ReviewPage() {
       {toast.message && <Toast message={toast.message} />}
     </div>
   );
-}
+};
+export default ReviewPage;
 
-function MediaSubToolbar({
+const MediaSubToolbar = ({
   onCreateSubtitles,
   onTranslations,
   onShare,
@@ -118,7 +119,7 @@ function MediaSubToolbar({
   onTranslations: () => void;
   onShare: () => void;
   onMore: () => void;
-}) {
+}) => {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 border-b border-black pb-4">
       <div className="flex items-center gap-3">
@@ -171,4 +172,4 @@ function MediaSubToolbar({
       </div>
     </div>
   );
-}
+};

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Video } from "lucide-react";
 
@@ -8,15 +8,9 @@ import { ClipListItem } from "@/components/library/ClipListItem";
 import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
 import { EditorialFilterBar, type FilterChip } from "@/components/ui/EditorialFilterBar";
 import { Toast } from "@/components/ui/Toast";
+import { useClips } from "@/hooks/useClips";
 import { useLibraryFilter } from "@/hooks/useLibraryFilter";
 import { useToast } from "@/hooks/useToast";
-import {
-  duplicateClipInStore,
-  getClipsSnapshot,
-  removeClipFromStore,
-  renameClipInStore,
-  subscribeToClips,
-} from "@/lib/library-mock-data";
 import { DEFAULT_SORT_OPTIONS, type LibrarySortOption, type LibraryStatusFilter } from "@/types/library";
 
 const STATUS_CHIPS: FilterChip[] = [
@@ -25,10 +19,10 @@ const STATUS_CHIPS: FilterChip[] = [
   { value: "draft", label: "Drafts" },
 ];
 
-export default function ClipsLibraryPage() {
+const ClipsLibraryPage = () => {
   const router = useRouter();
   const toast = useToast();
-  const clips = useSyncExternalStore(subscribeToClips, getClipsSnapshot, getClipsSnapshot);
+  const { clips, isLoading, error, removeClip, duplicateClip, renameClip } = useClips();
   const [view, setView] = useState<"cards" | "table">("cards");
 
   const filter = useLibraryFilter({
@@ -39,14 +33,14 @@ export default function ClipsLibraryPage() {
     getUpdatedAt: (clip) => clip.updatedAt,
   });
 
-  const removeClip = useCallback((id: string) => removeClipFromStore(id), []);
-  const duplicateClip = useCallback((id: string) => duplicateClipInStore(id), []);
-
-  const renameClip = useCallback((id: string, currentTitle: string) => {
-    const next = window.prompt("Rename clip", currentTitle)?.trim();
-    if (!next) return;
-    renameClipInStore(id, next);
-  }, []);
+  const handleRename = useCallback(
+    (id: string, currentTitle: string) => {
+      const next = window.prompt("Rename clip", currentTitle)?.trim();
+      if (!next) return;
+      void renameClip(id, next);
+    },
+    [renameClip],
+  );
 
   const hasAnyClips = clips.length > 0;
 
@@ -84,10 +78,16 @@ export default function ClipsLibraryPage() {
       />
 
       <p className="text-xs text-neutral-500">
-        Showing {filter.items.length} of {filter.totalCount} clips
+        {isLoading ? "Loading clips…" : `Showing ${filter.items.length} of ${filter.totalCount} clips`}
       </p>
 
-      {filter.items.length === 0 ? (
+      {error && (
+        <div role="alert" className="border border-red-600 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {!isLoading && filter.items.length === 0 ? (
         <LibraryEmptyState
           icon={Video}
           title={hasAnyClips ? "No clips match your search" : "No clips yet"}
@@ -107,10 +107,10 @@ export default function ClipsLibraryPage() {
             <ClipListItem
               key={clip.id}
               clip={clip}
-              onRename={() => renameClip(clip.id, clip.title)}
+              onRename={() => handleRename(clip.id, clip.title)}
               onMoveToProject={() => toast.show("Projects aren't available yet — check back soon.")}
-              onDuplicate={() => duplicateClip(clip.id)}
-              onDelete={() => removeClip(clip.id)}
+              onDuplicate={() => void duplicateClip(clip.id)}
+              onDelete={() => void removeClip(clip.id)}
             />
           ))}
         </div>
@@ -119,4 +119,5 @@ export default function ClipsLibraryPage() {
       {toast.message && <Toast message={toast.message} />}
     </div>
   );
-}
+};
+export default ClipsLibraryPage;

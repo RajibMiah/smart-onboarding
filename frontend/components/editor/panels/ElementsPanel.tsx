@@ -12,7 +12,7 @@ const ELEMENTS = [
   { id: "cursor-highlight", label: "Cursor Highlight", icon: Radar },
 ];
 
-export function ElementsPanel({ onNotify }: ElementsPanelProps) {
+export const ElementsPanel = ({ onNotify }: ElementsPanelProps) => {
   return (
     <div className="grid grid-cols-2 gap-2 p-3">
       {ELEMENTS.map(({ id, label, icon: Icon }) => (
@@ -28,4 +28,4 @@ export function ElementsPanel({ onNotify }: ElementsPanelProps) {
       ))}
     </div>
   );
-}
+};

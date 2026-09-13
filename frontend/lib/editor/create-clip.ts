@@ -2,7 +2,7 @@ import type { ClipKind, MediaAsset, TimelineClip } from "./types";
 import { clipTimelineEnd } from "./types";
 
 /** Wraps a fresh recording/upload as a bin asset, ready to drop on the timeline. */
-export function createMediaAsset(input: { src: string; name: string; duration: number; type: ClipKind }): MediaAsset {
+export const createMediaAsset = (input: { src: string; name: string; duration: number; type: ClipKind }): MediaAsset => {
   return {
     id: crypto.randomUUID(),
     type: input.type,
@@ -12,10 +12,10 @@ export function createMediaAsset(input: { src: string; name: string; duration: n
     thumbnails: [],
     waveformPeaks: [],
   };
-}
+};
 
 /** Places a bin asset onto the timeline, appended after the last clip of the same type. */
-export function createTimelineClipFromAsset(asset: MediaAsset, existingTracks: TimelineClip[]): TimelineClip {
+export const createTimelineClipFromAsset = (asset: MediaAsset, existingTracks: TimelineClip[]): TimelineClip => {
   const sameKind = existingTracks.filter((clip) => clip.type === asset.type);
   const startOffset = sameKind.reduce((max, clip) => Math.max(max, clipTimelineEnd(clip)), 0);
 
@@ -33,4 +33,4 @@ export function createTimelineClipFromAsset(asset: MediaAsset, existingTracks: T
     muted: false,
     volume: 1,
   };
-}
+};

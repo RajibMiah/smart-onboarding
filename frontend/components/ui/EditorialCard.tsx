@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * a body, and a full-width yellow action footer. Compound API so each tier
  * can be composed/omitted per use case (dashboard decks, library rows, …).
  */
-function EditorialCard({ className, children, ...props }: ComponentPropsWithoutRef<"div">) {
+const EditorialCard = ({ className, children, ...props }: ComponentPropsWithoutRef<"div">) => {
   return (
     <div
       className={cn("flex flex-col border-2 border-black bg-white shadow-card", className ?? "")}
@@ -19,7 +19,7 @@ function EditorialCard({ className, children, ...props }: ComponentPropsWithoutR
       {children}
     </div>
   );
-}
+};
 
 interface HeaderStripProps {
   /** e.g. "#01" — omit for items that don't need an index. */
@@ -29,7 +29,7 @@ interface HeaderStripProps {
   className?: string;
 }
 
-function HeaderStrip({ index, categoryLabel, metricLabel, className }: HeaderStripProps) {
+const HeaderStrip = ({ index, categoryLabel, metricLabel, className }: HeaderStripProps) => {
   return (
     <div className={cn("flex items-stretch justify-between border-b-2 border-black", className ?? "")}>
       <div className="flex items-stretch">
@@ -49,14 +49,14 @@ function HeaderStrip({ index, categoryLabel, metricLabel, className }: HeaderStr
       )}
     </div>
   );
-}
+};
 
 interface TagRowProps {
   tags: { label: string; tone?: "yellow" | "outline" }[];
   className?: string;
 }
 
-function TagRow({ tags, className }: TagRowProps) {
+const TagRow = ({ tags, className }: TagRowProps) => {
   if (tags.length === 0) return null;
   return (
     <div className={cn("flex flex-wrap gap-1.5 border-b border-black/20 p-2", className ?? "")}>
@@ -73,7 +73,7 @@ function TagRow({ tags, className }: TagRowProps) {
       ))}
     </div>
   );
-}
+};
 
 interface BodyProps {
   title: string;
@@ -84,7 +84,7 @@ interface BodyProps {
   className?: string;
 }
 
-function Body({ title, metaLine, description, thumbnail, className }: BodyProps) {
+const Body = ({ title, metaLine, description, thumbnail, className }: BodyProps) => {
   return (
     <div className={cn("flex flex-col gap-2 p-3", className ?? "")}>
       {thumbnail && <div className="overflow-hidden border border-black">{thumbnail}</div>}
@@ -101,7 +101,7 @@ function Body({ title, metaLine, description, thumbnail, className }: BodyProps)
       {description && <p className="text-sm leading-snug text-neutral-700">{description}</p>}
     </div>
   );
-}
+};
 
 interface FooterProps {
   label: string;
@@ -111,7 +111,7 @@ interface FooterProps {
   className?: string;
 }
 
-function Footer({ label, counter, onClick, href, className }: FooterProps) {
+const Footer = ({ label, counter, onClick, href, className }: FooterProps) => {
   const content = (
     <>
       <span className="truncate">{label}</span>
@@ -139,17 +139,17 @@ function Footer({ label, counter, onClick, href, className }: FooterProps) {
       {content}
     </button>
   );
-}
+};
 
 /** Flat, calm placeholder for a missing thumbnail — a busy striped pattern here is exactly the kind of visual noise the editorial style should avoid. */
-function HatchPlaceholder({ className, as: As = "div" }: { className?: string; as?: ElementType }) {
+const HatchPlaceholder = ({ className, as: As = "div" }: { className?: string; as?: ElementType }) => {
   return (
     <As className={cn("flex h-full w-full flex-col items-center justify-center gap-1 bg-neutral-50 text-neutral-400", className ?? "")}>
       <ImageOff className="h-5 w-5" />
       <span className="text-[11px] font-medium">No preview</span>
     </As>
   );
-}
+};
 
 EditorialCard.HeaderStrip = HeaderStrip;
 EditorialCard.TagRow = TagRow;

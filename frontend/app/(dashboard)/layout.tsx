@@ -11,7 +11,7 @@ import { UploadModal } from "@/components/modals/UploadModal";
  * and singletons (the upload modal, the support bubble) that only need one
  * instance regardless of which dashboard page is active.
  */
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+const DashboardLayout = ({ children }: { children: ReactNode }) => {
   return (
     <UIProvider>
       <div className="flex min-h-screen flex-col bg-brand-canvas">
@@ -25,4 +25,5 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <FloatingSupportButton />
     </UIProvider>
   );
-}
+};
+export default DashboardLayout;

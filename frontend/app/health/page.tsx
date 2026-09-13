@@ -19,7 +19,7 @@ type CheckState =
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export default function Home() {
+const Home = () => {
   const [check, setCheck] = useState<CheckState>({ phase: "loading" });
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export default function Home() {
 
     async function fetchHealth() {
       try {
-        const res = await fetch(`${API_URL}/api/health/`, { cache: "no-store" });
+        const res = await fetch(`${API_URL}/api/v1/auth/health/`, { cache: "no-store" });
         const data: HealthResponse = await res.json();
         if (!cancelled) setCheck({ phase: "success", data });
       } catch (err) {
@@ -61,14 +61,15 @@ export default function Home() {
         <StatusCard check={check} />
 
         <p className="text-xs text-zinc-500 dark:text-zinc-500">
-          Checking <code className="font-mono">{API_URL}/api/health/</code>
+          Checking <code className="font-mono">{API_URL}/api/v1/auth/health/</code>
         </p>
       </main>
     </div>
   );
-}
+};
+export default Home;
 
-function StatusCard({ check }: { check: CheckState }) {
+const StatusCard = ({ check }: { check: CheckState }) => {
   if (check.phase === "loading") {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
@@ -119,9 +120,9 @@ function StatusCard({ check }: { check: CheckState }) {
       </dl>
     </div>
   );
-}
+};
 
-function Spinner() {
+const Spinner = () => {
   return (
     <svg
       className="h-4 w-4 animate-spin text-zinc-400"
@@ -137,4 +138,4 @@ function Spinner() {
       />
     </svg>
   );
-}
+};

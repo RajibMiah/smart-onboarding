@@ -49,7 +49,7 @@ interface TimelineProps {
   isFullscreen: boolean;
 }
 
-export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: TimelineProps) {
+export const Timeline = ({ onNotify, onToggleFullscreen, isFullscreen }: TimelineProps) => {
   const {
     state,
     videoClips,
@@ -90,28 +90,28 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
   const canCut =
     !!selectedClip && state.currentTime > selectedClip.startOffset && state.currentTime < clipTimelineEnd(selectedClip);
 
-  function scrubToClientX(clientX: number) {
+  const scrubToClientX = (clientX: number) => {
     const rect = contentRef.current?.getBoundingClientRect();
     if (!rect) return;
     const seconds = Math.min(viewDurationSeconds, Math.max(0, (clientX - rect.left) / state.zoomLevel));
     seek(seconds);
-  }
+  };
 
-  function handleScrubPointerDown(event: React.PointerEvent) {
+  const handleScrubPointerDown = (event: React.PointerEvent) => {
     event.preventDefault();
     scrubToClientX(event.clientX);
-    function onMove(ev: PointerEvent) {
+    const onMove = (ev: PointerEvent) => {
       scrubToClientX(ev.clientX);
-    }
-    function onUp() {
+    };
+    const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-    }
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-  }
+  };
 
-  function snapToTimeline(time: number, excludeClipId: string): number {
+  const snapToTimeline = (time: number, excludeClipId: string): number => {
     if (!state.snappingEnabled) return time;
     const thresholdSeconds = SNAP_PIXEL_THRESHOLD / state.zoomLevel;
     const candidates = [0, Math.round(time)];
@@ -129,9 +129,9 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
       }
     }
     return best;
-  }
+  };
 
-  function beginClipDrag(event: React.PointerEvent, clip: TimelineClip, mode: DragMode) {
+  const beginClipDrag = (event: React.PointerEvent, clip: TimelineClip, mode: DragMode) => {
     event.stopPropagation();
     event.preventDefault();
     selectClip(clip.id);
@@ -142,7 +142,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
     // so a single Undo reverts the whole gesture rather than one pixel of it.
     updateClip(clip.id, {}, { commit: true });
 
-    function onMove(ev: PointerEvent) {
+    const onMove = (ev: PointerEvent) => {
       const deltaSeconds = (ev.clientX - startClientX) / state.zoomLevel;
 
       if (mode === "move") {
@@ -167,20 +167,20 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
       let newTrimEnd = original.trimStart + (proposedEnd - original.startOffset);
       newTrimEnd = Math.max(Math.min(newTrimEnd, original.duration), original.trimStart + MIN_CLIP_SECONDS);
       updateClip(clip.id, { trimEnd: newTrimEnd });
-    }
+    };
 
-    function onUp() {
+    const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-    }
+    };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-  }
+  };
 
-  function beginZoomDrag(event: React.PointerEvent, region: ZoomRegion, mode: DragMode) {
+  const beginZoomDrag = (event: React.PointerEvent, region: ZoomRegion, mode: DragMode) => {
     beginTimeRangeDrag(event, region, mode, state.zoomLevel, MIN_ZOOM_SECONDS, (changes) => updateZoomRegion(region.id, changes));
-  }
+  };
 
   const playheadLeft = state.currentTime * state.zoomLevel;
 
@@ -307,7 +307,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
       </div>
     </div>
   );
-}
+};
 
 interface TimelineToolbarProps {
   canCut: boolean;
@@ -332,7 +332,7 @@ interface TimelineToolbarProps {
   isFullscreen: boolean;
 }
 
-function TimelineToolbar({
+const TimelineToolbar = ({
   canCut,
   onCut,
   onCleanup,
@@ -353,7 +353,7 @@ function TimelineToolbar({
   onSetZoom,
   onToggleFullscreen,
   isFullscreen,
-}: TimelineToolbarProps) {
+}: TimelineToolbarProps) => {
   return (
     <div className="flex items-center justify-between border-b-2 border-black px-3 py-2">
       <div className="flex items-center gap-1">
@@ -399,9 +399,9 @@ function TimelineToolbar({
       </div>
     </div>
   );
-}
+};
 
-function ToolbarIconButton({
+const ToolbarIconButton = ({
   icon: Icon,
   label,
   onClick,
@@ -413,7 +413,7 @@ function ToolbarIconButton({
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -430,7 +430,7 @@ function ToolbarIconButton({
       <Icon className="h-4 w-4" />
     </button>
   );
-}
+};
 
 interface VideoClipBlockProps {
   clip: TimelineClip;
@@ -441,7 +441,7 @@ interface VideoClipBlockProps {
   onDragStart: (event: React.PointerEvent, clip: TimelineClip, mode: DragMode) => void;
 }
 
-function VideoClipBlock({ clip, zoomLevel, laneHeight, selected, onSelect, onDragStart }: VideoClipBlockProps) {
+const VideoClipBlock = ({ clip, zoomLevel, laneHeight, selected, onSelect, onDragStart }: VideoClipBlockProps) => {
   const left = clip.startOffset * zoomLevel;
   const width = Math.max(4, clipTimelineDuration(clip) * zoomLevel);
 
@@ -481,9 +481,9 @@ function VideoClipBlock({ clip, zoomLevel, laneHeight, selected, onSelect, onDra
       />
     </div>
   );
-}
+};
 
-function ZoomRegionBlock({
+const ZoomRegionBlock = ({
   region,
   zoomLevel,
   laneHeight,
@@ -493,7 +493,7 @@ function ZoomRegionBlock({
   zoomLevel: number;
   laneHeight: number;
   onDragStart: (event: React.PointerEvent, region: ZoomRegion, mode: DragMode) => void;
-}) {
+}) => {
   const left = region.startTime * zoomLevel;
   const width = Math.max(4, (region.endTime - region.startTime) * zoomLevel);
 
@@ -516,9 +516,9 @@ function ZoomRegionBlock({
       />
     </div>
   );
-}
+};
 
-function AudioShadowBlock({
+const AudioShadowBlock = ({
   clip,
   zoomLevel,
   laneHeight,
@@ -528,7 +528,7 @@ function AudioShadowBlock({
   zoomLevel: number;
   laneHeight: number;
   onToggleMute: () => void;
-}) {
+}) => {
   const left = clip.startOffset * zoomLevel;
   const width = Math.max(4, clipTimelineDuration(clip) * zoomLevel);
   const blockHeight = laneHeight - 10;
@@ -550,9 +550,9 @@ function AudioShadowBlock({
       </button>
     </div>
   );
-}
+};
 
-function WaveformCanvas({
+const WaveformCanvas = ({
   peaks,
   widthPx,
   heightPx,
@@ -562,7 +562,7 @@ function WaveformCanvas({
   widthPx: number;
   heightPx: number;
   color: string;
-}) {
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -590,14 +590,14 @@ function WaveformCanvas({
   }, [peaks, widthPx, heightPx, color]);
 
   return <canvas ref={canvasRef} style={{ width: widthPx, height: heightPx }} className="block" />;
-}
+};
 
-function pickTickInterval(zoomLevel: number): number {
+const pickTickInterval = (zoomLevel: number): number => {
   const candidates = [1, 2, 5, 10, 15, 30, 60];
   return candidates.find((seconds) => seconds * zoomLevel >= 50) ?? 60;
-}
+};
 
-function HiResToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+const HiResToggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => {
   return (
     <label className="flex items-center gap-2">
       <span>Switch to Hi-res</span>
@@ -621,4 +621,4 @@ function HiResToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => 
       </button>
     </label>
   );
-}
+};

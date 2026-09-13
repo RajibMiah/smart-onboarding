@@ -33,11 +33,11 @@ import { ZoomPanel } from "./panels/ZoomPanel";
  * `/studio/review`) so the same editing session survives the client-side
  * navigation to the review step instead of resetting.
  */
-export function EditorLayout() {
+export const EditorLayout = () => {
   return <EditorLayoutInner />;
-}
+};
 
-function EditorLayoutInner() {
+const EditorLayoutInner = () => {
   const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject, state, cancelZoomDrawing } =
     useEditor();
   const router = useRouter();
@@ -95,16 +95,16 @@ function EditorLayoutInner() {
   }, []);
 
   useEffect(() => {
-    function onChange() {
+    const onChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
-    }
+    };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
   // Global editor shortcuts — ignored while typing in a form field.
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
+    const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && (["INPUT", "TEXTAREA"].includes(target.tagName) || target.isContentEditable)) return;
 
@@ -127,7 +127,7 @@ function EditorLayoutInner() {
         event.preventDefault();
         cancelZoomDrawing();
       }
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [togglePlay, selectedClip, removeClip, undo, redo, splitClipAtPlayhead, state.isDrawingZoom, cancelZoomDrawing]);
@@ -139,7 +139,7 @@ function EditorLayoutInner() {
     }
   }, [videoClips.length, resetProject]);
 
-  function renderActivePanel(tool: StudioTool): ReactNode {
+  const renderActivePanel = (tool: StudioTool): ReactNode => {
     switch (tool) {
       case "auto-edit":
         return <AutoEditPanel onNotify={toast.show} />;
@@ -170,7 +170,7 @@ function EditorLayoutInner() {
       default:
         return null;
     }
-  }
+  };
 
   return (
     <div ref={studioRef} className="flex h-screen flex-col bg-white">
@@ -206,9 +206,9 @@ function EditorLayoutInner() {
       {toast.message && <Toast message={toast.message} />}
     </div>
   );
-}
+};
 
-function EditorHeader({ onDeleteProject, onNext }: { onDeleteProject: () => void; onNext: () => void }) {
+const EditorHeader = ({ onDeleteProject, onNext }: { onDeleteProject: () => void; onNext: () => void }) => {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b-2 border-black px-4">
       <Link href="/" className="flex items-center gap-2">
@@ -239,4 +239,4 @@ function EditorHeader({ onDeleteProject, onNext }: { onDeleteProject: () => void
       </div>
     </header>
   );
-}
+};

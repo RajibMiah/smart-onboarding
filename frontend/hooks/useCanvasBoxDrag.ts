@@ -14,9 +14,9 @@ interface UseCanvasBoxDragOptions {
   onChange: (bounds: BoundingBox) => void;
 }
 
-function clamp01(value: number): number {
+const clamp01 = (value: number): number => {
   return Math.min(1, Math.max(0, value));
-}
+};
 
 /**
  * Shared move/resize pointer math for a normalized `BoundingBox` overlaid on
@@ -24,7 +24,7 @@ function clamp01(value: number): number {
  * Deltas are measured in the container's own pixels, then normalized, so it
  * doesn't matter that the two overlays sit at different points in the tree.
  */
-export function useCanvasBoxDrag({ containerRef, bounds, onChange }: UseCanvasBoxDragOptions) {
+export const useCanvasBoxDrag = ({ containerRef, bounds, onChange }: UseCanvasBoxDragOptions) => {
   const beginMove = useCallback(
     (event: React.PointerEvent) => {
       const rect = containerRef.current?.getBoundingClientRect();
@@ -33,17 +33,17 @@ export function useCanvasBoxDrag({ containerRef, bounds, onChange }: UseCanvasBo
       const startClientY = event.clientY;
       const original = bounds;
 
-      function onMove(ev: PointerEvent) {
+      const onMove = (ev: PointerEvent) => {
         const dx = (ev.clientX - startClientX) / rect!.width;
         const dy = (ev.clientY - startClientY) / rect!.height;
         const x = clamp01(Math.min(Math.max(original.x + dx, 0), 1 - original.width));
         const y = clamp01(Math.min(Math.max(original.y + dy, 0), 1 - original.height));
         onChange({ ...original, x, y });
-      }
-      function onUp() {
+      };
+      const onUp = () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
-      }
+      };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
@@ -58,7 +58,7 @@ export function useCanvasBoxDrag({ containerRef, bounds, onChange }: UseCanvasBo
       const startClientY = event.clientY;
       const original = bounds;
 
-      function onMove(ev: PointerEvent) {
+      const onMove = (ev: PointerEvent) => {
         const dx = (ev.clientX - startClientX) / rect!.width;
         const dy = (ev.clientY - startClientY) / rect!.height;
         let { x, y, width, height } = original;
@@ -87,11 +87,11 @@ export function useCanvasBoxDrag({ containerRef, bounds, onChange }: UseCanvasBo
         y = clamp01(Math.min(Math.max(y, 0), 1 - height));
 
         onChange({ x, y, width, height });
-      }
-      function onUp() {
+      };
+      const onUp = () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
-      }
+      };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
@@ -99,4 +99,4 @@ export function useCanvasBoxDrag({ containerRef, bounds, onChange }: UseCanvasBo
   );
 
   return { beginMove, beginResize };
-}
+};

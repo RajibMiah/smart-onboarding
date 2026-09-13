@@ -24,7 +24,7 @@ const SHAPES: { id: BlurRegion["shape"]; label: string; icon: typeof Square }[] 
  * `isDrawingBlur` state) — the region itself is only created there, once the
  * user actually drags a box, so this panel just configures what exists.
  */
-export function BlurPanel({ onNotify }: BlurPanelProps) {
+export const BlurPanel = ({ onNotify }: BlurPanelProps) => {
   const { videoClips, state, startBlurDrawing, cancelBlurDrawing, updateBlurRegion, removeBlurRegion, selectBlurRegion } = useEditor();
   const hasMedia = videoClips.length > 0;
 
@@ -135,4 +135,4 @@ export function BlurPanel({ onNotify }: BlurPanelProps) {
       )}
     </div>
   );
-}
+};

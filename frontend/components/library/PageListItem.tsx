@@ -17,7 +17,7 @@ interface PageListItemProps {
   onDelete?: () => void;
 }
 
-export function PageListItem({ page, onOpen, onRename, onMoveToProject, onDuplicate, onDelete }: PageListItemProps) {
+export const PageListItem = ({ page, onOpen, onRename, onMoveToProject, onDuplicate, onDelete }: PageListItemProps) => {
   return (
     <div
       role="button"
@@ -74,4 +74,4 @@ export function PageListItem({ page, onOpen, onRename, onMoveToProject, onDuplic
       </EditorialCard>
     </div>
   );
-}
+};

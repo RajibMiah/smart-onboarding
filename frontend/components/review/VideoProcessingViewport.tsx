@@ -11,7 +11,7 @@ interface VideoProcessingViewportProps {
 }
 
 /** Processing spinner, empty state, or the actual playable clip, depending on `status`. */
-export function VideoProcessingViewport({ status, src }: VideoProcessingViewportProps) {
+export const VideoProcessingViewport = ({ status, src }: VideoProcessingViewportProps) => {
   return (
     <div className="relative mx-auto flex aspect-video w-full max-w-5xl flex-col items-center justify-center overflow-hidden border border-black bg-neutral-100">
       {status === "processing" && (
@@ -47,4 +47,4 @@ export function VideoProcessingViewport({ status, src }: VideoProcessingViewport
         ))}
     </div>
   );
-}
+};

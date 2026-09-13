@@ -7,10 +7,10 @@ import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
 import { PageListItem } from "@/components/library/PageListItem";
 import { EditorialFilterBar, type FilterChip } from "@/components/ui/EditorialFilterBar";
 import { Toast } from "@/components/ui/Toast";
+import { usePages } from "@/hooks/usePages";
 import { useLibraryFilter } from "@/hooks/useLibraryFilter";
 import { useToast } from "@/hooks/useToast";
-import { MOCK_PAGES } from "@/lib/library-mock-data";
-import { DEFAULT_SORT_OPTIONS, type LibrarySortOption, type LibraryStatusFilter, type PageItem } from "@/types/library";
+import { DEFAULT_SORT_OPTIONS, type LibrarySortOption, type LibraryStatusFilter } from "@/types/library";
 
 const STATUS_CHIPS: FilterChip[] = [
   { value: "all", label: "All results" },
@@ -18,9 +18,9 @@ const STATUS_CHIPS: FilterChip[] = [
   { value: "draft", label: "Drafts" },
 ];
 
-export default function PagesLibraryPage() {
+const PagesLibraryPage = () => {
   const toast = useToast();
-  const [pages, setPages] = useState<PageItem[]>(MOCK_PAGES);
+  const { pages, isLoading, error, createPage, removePage, duplicatePage, renamePage } = usePages();
   const [view, setView] = useState<"cards" | "table">("cards");
 
   const filter = useLibraryFilter({
@@ -31,32 +31,24 @@ export default function PagesLibraryPage() {
     getUpdatedAt: (page) => page.updatedAt,
   });
 
-  const removePage = useCallback((id: string) => {
-    setPages((prev) => prev.filter((page) => page.id !== id));
-  }, []);
+  const handleCreate = useCallback(async () => {
+    const title = window.prompt("New page title", "Untitled page")?.trim();
+    if (!title) return;
+    try {
+      await createPage(title);
+    } catch {
+      toast.show("Couldn't create the page — try again.");
+    }
+  }, [createPage, toast]);
 
-  const duplicatePage = useCallback((id: string) => {
-    setPages((prev) => {
-      const source = prev.find((page) => page.id === id);
-      if (!source) return prev;
-      const copy: PageItem = {
-        ...source,
-        id: crypto.randomUUID(),
-        title: `${source.title} (copy)`,
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        views: 0,
-      };
-      return [copy, ...prev];
-    });
-  }, []);
-
-  const renamePage = useCallback((id: string, currentTitle: string) => {
-    const next = window.prompt("Rename page", currentTitle)?.trim();
-    if (!next) return;
-    setPages((prev) => prev.map((page) => (page.id === id ? { ...page, title: next, updatedAt: new Date().toISOString() } : page)));
-  }, []);
+  const handleRename = useCallback(
+    (id: string, currentTitle: string) => {
+      const next = window.prompt("Rename page", currentTitle)?.trim();
+      if (!next) return;
+      void renamePage(id, next);
+    },
+    [renamePage],
+  );
 
   const hasAnyPages = pages.length > 0;
 
@@ -66,7 +58,7 @@ export default function PagesLibraryPage() {
         <h1 className="text-2xl font-bold tracking-tight text-black">Pages</h1>
         <button
           type="button"
-          onClick={() => toast.show("Page editing isn't available in this preview yet.")}
+          onClick={() => void handleCreate()}
           className="border-2 border-black bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-800"
         >
           + New Page
@@ -94,10 +86,16 @@ export default function PagesLibraryPage() {
       />
 
       <p className="text-xs text-neutral-500">
-        Showing {filter.items.length} of {filter.totalCount} pages
+        {isLoading ? "Loading pages…" : `Showing ${filter.items.length} of ${filter.totalCount} pages`}
       </p>
 
-      {filter.items.length === 0 ? (
+      {error && (
+        <div role="alert" className="border border-red-600 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {!isLoading && filter.items.length === 0 ? (
         <LibraryEmptyState
           icon={FileText}
           title={hasAnyPages ? "No pages match your search" : "No pages yet"}
@@ -107,7 +105,7 @@ export default function PagesLibraryPage() {
               : "Create a page to start writing documentation for your team."
           }
           actionLabel={hasAnyPages ? undefined : "New Page"}
-          onAction={hasAnyPages ? undefined : () => toast.show("Page editing isn't available in this preview yet.")}
+          onAction={hasAnyPages ? undefined : () => void handleCreate()}
         />
       ) : view === "table" ? (
         <LibraryEmptyState title="Table view isn't ready yet" description='Switch back to "Cards" to see your pages.' />
@@ -118,10 +116,10 @@ export default function PagesLibraryPage() {
               key={page.id}
               page={page}
               onOpen={() => toast.show("Page editing isn't available in this preview yet.")}
-              onRename={() => renamePage(page.id, page.title)}
+              onRename={() => handleRename(page.id, page.title)}
               onMoveToProject={() => toast.show("Projects aren't available yet — check back soon.")}
-              onDuplicate={() => duplicatePage(page.id)}
-              onDelete={() => removePage(page.id)}
+              onDuplicate={() => void duplicatePage(page.id)}
+              onDelete={() => void removePage(page.id)}
             />
           ))}
         </div>
@@ -130,4 +128,5 @@ export default function PagesLibraryPage() {
       {toast.message && <Toast message={toast.message} />}
     </div>
   );
-}
+};
+export default PagesLibraryPage;

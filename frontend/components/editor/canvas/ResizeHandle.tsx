@@ -10,7 +10,7 @@ const CORNER_CLASS: Record<ResizeCorner, string> = {
   se: "-right-1.5 -bottom-1.5 cursor-nwse-resize",
 };
 
-export function ResizeHandle({ corner, onDragStart }: { corner: ResizeCorner; onDragStart: (event: React.PointerEvent) => void }) {
+export const ResizeHandle = ({ corner, onDragStart }: { corner: ResizeCorner; onDragStart: (event: React.PointerEvent) => void }) => {
   return (
     <div
       onPointerDown={(event) => {
@@ -20,4 +20,4 @@ export function ResizeHandle({ corner, onDragStart }: { corner: ResizeCorner; on
       className={cn("absolute h-3 w-3 border-2 border-black bg-brand-yellow", CORNER_CLASS[corner])}
     />
   );
-}
+};

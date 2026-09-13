@@ -8,6 +8,7 @@ import { EditorProvider } from "@/context/EditorContext";
  * timeline editor to the review step and back — the provider only mounts
  * once here, not per-page.
  */
-export default function StudioLayout({ children }: { children: ReactNode }) {
+const StudioLayout = ({ children }: { children: ReactNode }) => {
   return <EditorProvider>{children}</EditorProvider>;
-}
+};
+export default StudioLayout;

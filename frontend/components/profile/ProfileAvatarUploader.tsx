@@ -14,7 +14,7 @@ interface ProfileAvatarUploaderProps {
 }
 
 /** Circular avatar with an upload trigger; previews the picked image instantly, client-side only. */
-export function ProfileAvatarUploader({ initials, avatarUrl, onAvatarChange }: ProfileAvatarUploaderProps) {
+export const ProfileAvatarUploader = ({ initials, avatarUrl, onAvatarChange }: ProfileAvatarUploaderProps) => {
   const { previewUrl, error, fileInputRef, openFilePicker, handleFileChange } = useAvatarUpload();
 
   // Bubble a freshly-picked image up to the shared UIContext avatar once the
@@ -56,4 +56,4 @@ export function ProfileAvatarUploader({ initials, avatarUrl, onAvatarChange }: P
       {error && <p className="max-w-40 text-center text-xs text-red-600">{error}</p>}
     </div>
   );
-}
+};

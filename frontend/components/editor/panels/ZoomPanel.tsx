@@ -18,7 +18,7 @@ const MAX_SCALE = 3;
  * `isDrawingZoom` state) — the region itself is only created there, once the
  * user actually drags a box, so this panel just lists what already exists.
  */
-export function ZoomPanel({ onNotify }: ZoomPanelProps) {
+export const ZoomPanel = ({ onNotify }: ZoomPanelProps) => {
   const { videoClips, state, startZoomDrawing, cancelZoomDrawing, updateZoomRegion, removeZoomRegion } = useEditor();
   const hasMedia = videoClips.length > 0;
 
@@ -94,4 +94,4 @@ export function ZoomPanel({ onNotify }: ZoomPanelProps) {
       )}
     </div>
   );
-}
+};

@@ -13,13 +13,13 @@ interface TextTimelineTrackProps {
   onLaneScrub: (event: React.PointerEvent) => void;
 }
 
-function truncate(text: string): string {
+const truncate = (text: string): string => {
   const trimmed = text.trim() || "Text";
   return trimmed.length > LABEL_MAX_CHARS ? `${trimmed.slice(0, LABEL_MAX_CHARS)}…` : trimmed;
-}
+};
 
 /** Timeline lane for text regions — same move/trim mechanics as the zoom lane. */
-export function TextTimelineTrack({ laneHeight, onLaneScrub }: TextTimelineTrackProps) {
+export const TextTimelineTrack = ({ laneHeight, onLaneScrub }: TextTimelineTrackProps) => {
   const { state, updateTextRegion, selectTextRegion } = useEditor();
 
   return (
@@ -28,12 +28,12 @@ export function TextTimelineTrack({ laneHeight, onLaneScrub }: TextTimelineTrack
         const left = region.startTime * state.zoomLevel;
         const width = Math.max(4, (region.endTime - region.startTime) * state.zoomLevel);
 
-        function onDragStart(event: React.PointerEvent, mode: TimeRangeDragMode) {
+        const onDragStart = (event: React.PointerEvent, mode: TimeRangeDragMode) => {
           selectTextRegion(region.id);
           beginTimeRangeDrag(event, region, mode, state.zoomLevel, MIN_TEXT_SECONDS, (changes) =>
             updateTextRegion(region.id, changes),
           );
-        }
+        };
 
         return (
           <div
@@ -58,4 +58,4 @@ export function TextTimelineTrack({ laneHeight, onLaneScrub }: TextTimelineTrack
       })}
     </div>
   );
-}
+};

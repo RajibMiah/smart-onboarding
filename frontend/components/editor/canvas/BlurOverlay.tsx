@@ -15,9 +15,9 @@ interface BlurOverlayProps {
 
 const MIN_DRAG_PX = 12;
 
-function clamp(value: number, min: number, max: number): number {
+const clamp = (value: number, min: number, max: number): number => {
   return Math.min(Math.max(value, min), max);
-}
+};
 
 /**
  * Mirrors the zoom marquee: draw-to-create while `isDrawingBlur`, then
@@ -26,21 +26,21 @@ function clamp(value: number, min: number, max: number): number {
  * "active" convention as `activeZoomRegion`, so a region is only editable
  * on canvas while the playhead sits inside its own time range.
  */
-export function BlurOverlay({ containerRef }: BlurOverlayProps) {
+export const BlurOverlay = ({ containerRef }: BlurOverlayProps) => {
   const { state, activeBlurRegions, addBlurRegion, updateBlurRegion, selectBlurRegion, cancelBlurDrawing } = useEditor();
   const dragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [dragBox, setDragBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
-  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const origin = { x: clamp(event.clientX - rect.left, 0, rect.width), y: clamp(event.clientY - rect.top, 0, rect.height) };
     dragOriginRef.current = origin;
     setDragBox({ left: origin.x, top: origin.y, width: 0, height: 0 });
-  }
+  };
 
-  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const origin = dragOriginRef.current;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!origin || !rect) return;
@@ -52,9 +52,9 @@ export function BlurOverlay({ containerRef }: BlurOverlayProps) {
       width: Math.abs(currentX - origin.x),
       height: Math.abs(currentY - origin.y),
     });
-  }
+  };
 
-  function handlePointerUp() {
+  const handlePointerUp = () => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect && dragBox && dragBox.width > MIN_DRAG_PX && dragBox.height > MIN_DRAG_PX) {
       addBlurRegion({
@@ -68,7 +68,7 @@ export function BlurOverlay({ containerRef }: BlurOverlayProps) {
     }
     dragOriginRef.current = null;
     setDragBox(null);
-  }
+  };
 
   return (
     <>
@@ -110,9 +110,9 @@ export function BlurOverlay({ containerRef }: BlurOverlayProps) {
       )}
     </>
   );
-}
+};
 
-function BlurRegionBox({
+const BlurRegionBox = ({
   region,
   containerRef,
   selected,
@@ -124,7 +124,7 @@ function BlurRegionBox({
   selected: boolean;
   onSelect: () => void;
   onChangeBounds: (bounds: BoundingBox) => void;
-}) {
+}) => {
   const { beginMove, beginResize } = useCanvasBoxDrag({ containerRef, bounds: region.bounds, onChange: onChangeBounds });
 
   return (
@@ -157,4 +157,4 @@ function BlurRegionBox({
       )}
     </div>
   );
-}
+};

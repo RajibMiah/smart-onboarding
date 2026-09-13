@@ -14,7 +14,7 @@ interface StatLeaderboardProps {
 }
 
 /** Bordered right-rail widget: a ranked table plus an optional headline stat block. */
-export function StatLeaderboard({ title, rows, summary }: StatLeaderboardProps) {
+export const StatLeaderboard = ({ title, rows, summary }: StatLeaderboardProps) => {
   return (
     <div className="flex flex-col gap-4">
       <div className="border-2 border-black">
@@ -48,4 +48,4 @@ export function StatLeaderboard({ title, rows, summary }: StatLeaderboardProps) 
       )}
     </div>
   );
-}
+};

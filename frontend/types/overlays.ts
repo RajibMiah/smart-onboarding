@@ -34,10 +34,10 @@ export interface TextRegion {
   };
 }
 
-export function blurRegionDuration(region: BlurRegion): number {
+export const blurRegionDuration = (region: BlurRegion): number => {
   return Math.max(0, region.endTime - region.startTime);
-}
+};
 
-export function textRegionDuration(region: TextRegion): number {
+export const textRegionDuration = (region: TextRegion): number => {
   return Math.max(0, region.endTime - region.startTime);
-}
+};

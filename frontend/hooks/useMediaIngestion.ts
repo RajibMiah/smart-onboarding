@@ -29,7 +29,7 @@ interface UseMediaIngestionResult {
  * waveform asynchronously once ffmpeg.wasm has processed it — the editor
  * never blocks on the wasm engine loading.
  */
-export function useMediaIngestion(): UseMediaIngestionResult {
+export const useMediaIngestion = (): UseMediaIngestionResult => {
   const { state, addMediaAsset, addClip, setThumbnails, setAssetThumbnails, setWaveform, setAssetWaveform } = useEditor();
   const { generateThumbnails, extractAudio } = useFFmpegWasm();
 
@@ -65,4 +65,4 @@ export function useMediaIngestion(): UseMediaIngestionResult {
   );
 
   return { ingest };
-}
+};

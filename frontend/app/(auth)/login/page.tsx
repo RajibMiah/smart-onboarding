@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -9,16 +10,19 @@ import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { Toast } from "@/components/ui/Toast";
 import { useAuthForm } from "@/hooks/useAuthForm";
 import { useToast } from "@/hooks/useToast";
+import { authApi } from "@/lib/api-client";
 import type { LoginCredentials } from "@/types/auth";
 
-export default function LoginPage() {
+const LoginPage = () => {
+  const router = useRouter();
   const toast = useToast();
   const [showPassword, setShowPassword] = useState(false);
 
   const { values, errors, isSubmitting, submitError, setField, handleSubmit } = useAuthForm<LoginCredentials>({
     initialValues: { email: "", password: "" },
-    onSubmit: async () => {
-      toast.show("Login isn't available in this offline preview yet.");
+    onSubmit: async (credentials) => {
+      await authApi.login(credentials);
+      router.push("/");
     },
   });
 
@@ -116,4 +120,5 @@ export default function LoginPage() {
       {toast.message && <Toast message={toast.message} />}
     </AuthCard>
   );
-}
+};
+export default LoginPage;

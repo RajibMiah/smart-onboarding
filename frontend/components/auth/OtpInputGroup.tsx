@@ -13,7 +13,7 @@ interface OtpInputGroupProps {
 }
 
 /** Controlled, presentational 6-box code input — all state/focus logic lives in `useOtpVerification`. */
-export function OtpInputGroup({ length, digits, registerInputRef, onChange, onKeyDown, onPaste, disabled }: OtpInputGroupProps) {
+export const OtpInputGroup = ({ length, digits, registerInputRef, onChange, onKeyDown, onPaste, disabled }: OtpInputGroupProps) => {
   return (
     <div role="group" aria-label="One-time verification code" className="flex justify-center gap-2">
       {Array.from({ length }).map((_, index) => (
@@ -35,4 +35,4 @@ export function OtpInputGroup({ length, digits, registerInputRef, onChange, onKe
       ))}
     </div>
   );
-}
+};

@@ -2,7 +2,7 @@
 
 import { MessageCircle } from "lucide-react";
 
-export function FloatingSupportButton() {
+export const FloatingSupportButton = () => {
   return (
     <button
       type="button"
@@ -12,4 +12,4 @@ export function FloatingSupportButton() {
       <MessageCircle className="h-5 w-5" />
     </button>
   );
-}
+};

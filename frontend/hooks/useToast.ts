@@ -9,7 +9,7 @@ interface UseToastResult {
 }
 
 /** Minimal ephemeral toast for stubbed actions (no backend yet) — auto-dismisses. */
-export function useToast(autoDismissMs = 2600): UseToastResult {
+export const useToast = (autoDismissMs = 2600): UseToastResult => {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,4 +22,4 @@ export function useToast(autoDismissMs = 2600): UseToastResult {
   const dismiss = useCallback(() => setMessage(null), []);
 
   return { message, show, dismiss };
-}
+};

@@ -18,7 +18,7 @@ interface DocumentationEditorProps {
 }
 
 /** Description textarea + AI/attach triggers, and the step-by-step guide builder. */
-export function DocumentationEditor({
+export const DocumentationEditor = ({
   description,
   onDescriptionChange,
   onAutoCreateDescription,
@@ -27,7 +27,7 @@ export function DocumentationEditor({
   onAddStep,
   onUpdateStep,
   onRemoveStep,
-}: DocumentationEditorProps) {
+}: DocumentationEditorProps) => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
@@ -80,9 +80,9 @@ export function DocumentationEditor({
       </button>
     </div>
   );
-}
+};
 
-function StepCard({
+const StepCard = ({
   index,
   step,
   onUpdate,
@@ -92,15 +92,15 @@ function StepCard({
   step: DocumentationStep;
   onUpdate: (changes: Partial<Omit<DocumentationStep, "id">>) => void;
   onRemove: () => void;
-}) {
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     onUpdate({ imageUrl: URL.createObjectURL(file) });
     event.target.value = "";
-  }
+  };
 
   return (
     <div className="border border-black p-3">
@@ -163,4 +163,4 @@ function StepCard({
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
     </div>
   );
-}
+};

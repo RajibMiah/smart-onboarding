@@ -31,7 +31,7 @@ interface EditorialFilterBarProps {
 }
 
 /** Segmented filter chips + search + selects + cards/table toggle, all sharp-bordered. */
-export function EditorialFilterBar({
+export const EditorialFilterBar = ({
   chips = [],
   activeChip,
   onChipChange,
@@ -41,7 +41,7 @@ export function EditorialFilterBar({
   selects = [],
   view,
   onViewChange,
-}: EditorialFilterBarProps) {
+}: EditorialFilterBarProps) => {
   return (
     <div className="flex flex-col gap-3">
       {chips.length > 0 && (
@@ -123,4 +123,4 @@ export function EditorialFilterBar({
       </div>
     </div>
   );
-}
+};

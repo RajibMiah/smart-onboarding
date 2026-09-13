@@ -7,21 +7,21 @@ import { useEffect, type RefObject } from "react";
  * Accepts multiple refs so a trigger button (e.g. a dropdown's chevron) can be
  * excluded from "outside" without a second layer of state.
  */
-export function useClickOutside(
+export const useClickOutside = (
   refs: RefObject<HTMLElement | null> | RefObject<HTMLElement | null>[],
   handler: (event: MouseEvent | TouchEvent) => void,
   active = true,
-): void {
+): void => {
   useEffect(() => {
     if (!active) return;
 
     const refList = Array.isArray(refs) ? refs : [refs];
 
-    function onPointerDown(event: MouseEvent | TouchEvent) {
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
       const isInside = refList.some((ref) => ref.current?.contains(target));
       if (!isInside) handler(event);
-    }
+    };
 
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("touchstart", onPointerDown);
@@ -30,4 +30,4 @@ export function useClickOutside(
       document.removeEventListener("touchstart", onPointerDown);
     };
   }, [refs, handler, active]);
-}
+};

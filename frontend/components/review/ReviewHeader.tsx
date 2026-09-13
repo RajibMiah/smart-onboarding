@@ -14,7 +14,7 @@ interface ReviewHeaderProps {
 }
 
 /** Top action bar for the Review & Publish page — no dashboard chrome, mirrors the Studio's own header. */
-export function ReviewHeader({ onEditClick, isPublished, onTogglePublished, onEnableVersioning, onDone }: ReviewHeaderProps) {
+export const ReviewHeader = ({ onEditClick, isPublished, onTogglePublished, onEnableVersioning, onDone }: ReviewHeaderProps) => {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-black px-4">
       <button
@@ -68,4 +68,4 @@ export function ReviewHeader({ onEditClick, isPublished, onTogglePublished, onEn
       </div>
     </header>
   );
-}
+};

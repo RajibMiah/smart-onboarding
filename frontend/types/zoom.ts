@@ -17,6 +17,6 @@ export interface ZoomRegion {
   bounds: ZoomRegionBounds;
 }
 
-export function zoomRegionDuration(region: ZoomRegion): number {
+export const zoomRegionDuration = (region: ZoomRegion): number => {
   return Math.max(0, region.endTime - region.startTime);
-}
+};

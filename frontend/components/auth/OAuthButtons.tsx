@@ -7,7 +7,7 @@ interface OAuthButtonsProps {
 }
 
 /** Microsoft SSO trigger + a mocked "continue as" Google account badge — both stubs, no OAuth backend yet. */
-export function OAuthButtons({ onNotify }: OAuthButtonsProps) {
+export const OAuthButtons = ({ onNotify }: OAuthButtonsProps) => {
   return (
     <div className="flex flex-col gap-3">
       <button
@@ -37,9 +37,9 @@ export function OAuthButtons({ onNotify }: OAuthButtonsProps) {
       </button>
     </div>
   );
-}
+};
 
-function MicrosoftIcon({ className }: { className?: string }) {
+const MicrosoftIcon = ({ className }: { className?: string }) => {
   return (
     <svg viewBox="0 0 21 21" className={className} aria-hidden="true">
       <rect x="1" y="1" width="9" height="9" fill="#F25022" />
@@ -48,9 +48,9 @@ function MicrosoftIcon({ className }: { className?: string }) {
       <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
     </svg>
   );
-}
+};
 
-function GoogleIcon({ className }: { className?: string }) {
+const GoogleIcon = ({ className }: { className?: string }) => {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.42 3.58v3h3.91c2.29-2.11 3.53-5.22 3.53-8.82z" />
@@ -59,4 +59,4 @@ function GoogleIcon({ className }: { className?: string }) {
       <path fill="#EA4335" d="M12 4.75c1.76 0 3.34.6 4.59 1.79l3.44-3.44C17.94 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.28 6.56l4.06 3.09C6.28 6.84 8.9 4.75 12 4.75z" />
     </svg>
   );
-}
+};

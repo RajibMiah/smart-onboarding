@@ -5,6 +5,8 @@ export interface LoginCredentials {
 
 export interface WorkspaceRegistration {
   email: string;
+  password: string;
+  organizationName: string;
   acceptedPrivacyPolicy: boolean;
 }
 

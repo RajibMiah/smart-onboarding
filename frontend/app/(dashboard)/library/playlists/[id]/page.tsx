@@ -1,25 +1,34 @@
 "use client";
 
-import { use, useSyncExternalStore } from "react";
+import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft, ListVideo } from "lucide-react";
 
 import { ClipListItem } from "@/components/library/ClipListItem";
 import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
-import { getClipsSnapshot, subscribeToClips } from "@/lib/library-mock-data";
-import { getPlaylistsSnapshot, subscribeToPlaylists } from "@/lib/playlist-mock-data";
+import { useClips } from "@/hooks/useClips";
+import { usePlaylists } from "@/hooks/usePlaylists";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface PlaylistDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function PlaylistDetailPage({ params }: PlaylistDetailPageProps) {
+const PlaylistDetailPage = ({ params }: PlaylistDetailPageProps) => {
   const { id } = use(params);
-  const playlists = useSyncExternalStore(subscribeToPlaylists, getPlaylistsSnapshot, getPlaylistsSnapshot);
-  const clips = useSyncExternalStore(subscribeToClips, getClipsSnapshot, getClipsSnapshot);
+  const { playlists, isLoading } = usePlaylists();
+  const { clips } = useClips();
 
   const playlist = playlists.find((item) => item.id === id);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto flex max-w-5xl flex-col gap-5">
+        <BackLink />
+        <p className="text-xs text-neutral-500">Loading playlist…</p>
+      </div>
+    );
+  }
 
   if (!playlist) {
     return (
@@ -78,13 +87,14 @@ export default function PlaylistDetailPage({ params }: PlaylistDetailPageProps) 
       )}
     </div>
   );
-}
+};
+export default PlaylistDetailPage;
 
-function BackLink() {
+const BackLink = () => {
   return (
     <Link href="/library/playlists" className="flex w-fit items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-black">
       <ArrowLeft className="h-3.5 w-3.5" />
       Back to Playlists
     </Link>
   );
-}
+};

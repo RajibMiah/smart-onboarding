@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type Key
 
 const RESEND_COOLDOWN_SECONDS = 45;
 
-function formatCountdown(totalSeconds: number): string {
+const formatCountdown = (totalSeconds: number): string => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
+};
 
 /**
  * Owns OTP digit state, the resend cooldown timer, and DOM focus-shifting
@@ -16,7 +16,7 @@ function formatCountdown(totalSeconds: number): string {
  * array the consuming input group registers into — `OtpInputGroup` is a thin
  * controlled view over this.
  */
-export function useOtpVerification(length: number = 6) {
+export const useOtpVerification = (length: number = 6) => {
   const [digits, setDigits] = useState<string[]>(() => Array(length).fill(""));
   const [secondsRemaining, setSecondsRemaining] = useState(RESEND_COOLDOWN_SECONDS);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -98,4 +98,4 @@ export function useOtpVerification(length: number = 6) {
     resend,
     reset,
   };
-}
+};

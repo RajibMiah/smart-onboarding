@@ -19,7 +19,7 @@ interface TextOverlayProps {
  * regions are. Double-click swaps the box into `contentEditable` for
  * inline editing; the panel's own textarea edits the same `content` field.
  */
-export function TextOverlay({ containerRef }: TextOverlayProps) {
+export const TextOverlay = ({ containerRef }: TextOverlayProps) => {
   const { state, activeTextRegions, selectTextRegion, updateTextRegion } = useEditor();
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -45,9 +45,9 @@ export function TextOverlay({ containerRef }: TextOverlayProps) {
       ))}
     </div>
   );
-}
+};
 
-function TextRegionBox({
+const TextRegionBox = ({
   region,
   containerRef,
   selected,
@@ -65,7 +65,7 @@ function TextRegionBox({
   onStartEditing: () => void;
   onCommitContent: (content: string) => void;
   onChangeBounds: (bounds: TextRegion["bounds"]) => void;
-}) {
+}) => {
   const { beginMove, beginResize } = useCanvasBoxDrag({ containerRef, bounds: region.bounds, onChange: onChangeBounds });
   const justify = region.style.textAlign === "center" ? "center" : region.style.textAlign === "right" ? "flex-end" : "flex-start";
   const editableRef = useRef<HTMLDivElement>(null);
@@ -141,4 +141,4 @@ function TextRegionBox({
       )}
     </div>
   );
-}
+};

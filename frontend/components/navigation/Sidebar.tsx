@@ -73,31 +73,35 @@ const NAV_ITEMS: NavItem[] = [
     label: "Settings",
     href: "/settings",
     icon: Settings,
-    subItems: [{ label: "My Account", href: "/settings/account" }, { label: "Workspace" }],
+    subItems: [
+      { label: "My Account", href: "/settings/account" },
+      { label: "Manage Users", href: "/admin/users" },
+      { label: "Workspace" },
+    ],
   },
 ];
 
-function isItemActive(pathname: string, href: string): boolean {
+const isItemActive = (pathname: string, href: string): boolean => {
   if (href === "/") return pathname === "/";
   return pathname.startsWith(href);
-}
+};
 
 /** Shared nav list — rendered once for desktop, once inside the mobile drawer. */
-function NavList({ collapsed }: { collapsed: boolean }) {
+const NavList = ({ collapsed }: { collapsed: boolean }) => {
   const pathname = usePathname();
   // Manual expand/collapse for sections that *aren't* the active route —
   // the section containing the current page (e.g. "My Library" under any
   // /library/* route) is always forced open below, no state needed for that.
   const [manuallyExpanded, setManuallyExpanded] = useState<Set<string>>(new Set());
 
-  function toggleExpanded(id: string) {
+  const toggleExpanded = (id: string) => {
     setManuallyExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }
+  };
 
   return (
     <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-3">
@@ -173,9 +177,9 @@ function NavList({ collapsed }: { collapsed: boolean }) {
       })}
     </nav>
   );
-}
+};
 
-export function Sidebar() {
+export const Sidebar = () => {
   const { sidebarCollapsed, toggleSidebarCollapsed } = useUI();
 
   return (
@@ -207,9 +211,9 @@ export function Sidebar() {
       <MobileDrawer />
     </>
   );
-}
+};
 
-function MobileDrawer() {
+const MobileDrawer = () => {
   const { mobileSidebarOpen, closeMobileSidebar } = useUI();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -242,4 +246,4 @@ function MobileDrawer() {
       </div>
     </div>
   );
-}
+};

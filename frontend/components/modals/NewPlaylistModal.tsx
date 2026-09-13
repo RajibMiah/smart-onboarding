@@ -14,7 +14,7 @@ interface NewPlaylistModalProps {
   onCreate: (input: { title: string; description: string; visibility: PlaylistVisibility }) => void;
 }
 
-function NewPlaylistModalImpl({ onCreate }: NewPlaylistModalProps) {
+const NewPlaylistModalImpl = ({ onCreate }: NewPlaylistModalProps) => {
   const { isOpen, close } = useModal(NEW_PLAYLIST_MODAL_ID);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -22,7 +22,7 @@ function NewPlaylistModalImpl({ onCreate }: NewPlaylistModalProps) {
 
   if (!isOpen) return null;
 
-  function handleSubmit(event: FormEvent) {
+  const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) return;
     onCreate({ title: title.trim(), description: description.trim(), visibility });
@@ -30,7 +30,7 @@ function NewPlaylistModalImpl({ onCreate }: NewPlaylistModalProps) {
     setDescription("");
     setVisibility("private");
     close();
-  }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -114,6 +114,6 @@ function NewPlaylistModalImpl({ onCreate }: NewPlaylistModalProps) {
       </div>
     </div>
   );
-}
+};
 
 export const NewPlaylistModal = withPortal(NewPlaylistModalImpl);

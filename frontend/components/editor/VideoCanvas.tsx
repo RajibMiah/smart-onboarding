@@ -26,9 +26,9 @@ interface DragBox {
   height: number;
 }
 
-function clamp(value: number, min: number, max: number): number {
+const clamp = (value: number, min: number, max: number): number => {
   return Math.min(Math.max(value, min), max);
-}
+};
 
 interface VideoCanvasProps {
   onStartScreenRecording: () => void;
@@ -38,13 +38,13 @@ interface VideoCanvasProps {
   onTurnSlides: () => void;
 }
 
-export function VideoCanvas({
+export const VideoCanvas = ({
   onStartScreenRecording,
   onStartCameraRecording,
   onTriggerUpload,
   onOpenLibrary,
   onTurnSlides,
-}: VideoCanvasProps) {
+}: VideoCanvasProps) => {
   const { videoClips, state, activeZoomRegion, addZoomRegion, cancelZoomDrawing } = useEditor();
   const { videoRef, activeClip } = useTimelinePlayback();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -64,16 +64,16 @@ export function VideoCanvas({
     ? `${(activeZoomRegion.bounds.x + activeZoomRegion.bounds.width / 2) * 100}% ${(activeZoomRegion.bounds.y + activeZoomRegion.bounds.height / 2) * 100}%`
     : "50% 50%";
 
-  function handleMarqueePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+  const handleMarqueePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = canvasBoxRef.current?.getBoundingClientRect();
     if (!rect) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const origin = { x: clamp(event.clientX - rect.left, 0, rect.width), y: clamp(event.clientY - rect.top, 0, rect.height) };
     dragOriginRef.current = origin;
     setDragBox({ left: origin.x, top: origin.y, width: 0, height: 0 });
-  }
+  };
 
-  function handleMarqueePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+  const handleMarqueePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const origin = dragOriginRef.current;
     const rect = canvasBoxRef.current?.getBoundingClientRect();
     if (!origin || !rect) return;
@@ -85,9 +85,9 @@ export function VideoCanvas({
       width: Math.abs(currentX - origin.x),
       height: Math.abs(currentY - origin.y),
     });
-  }
+  };
 
-  function handleMarqueePointerUp() {
+  const handleMarqueePointerUp = () => {
     const rect = canvasBoxRef.current?.getBoundingClientRect();
     if (rect && dragBox && dragBox.width > MIN_ZOOM_DRAG_PX && dragBox.height > MIN_ZOOM_DRAG_PX) {
       addZoomRegion({
@@ -101,7 +101,7 @@ export function VideoCanvas({
     }
     dragOriginRef.current = null;
     setDragBox(null);
-  }
+  };
 
   return (
     <section className="relative flex min-w-0 flex-1 items-center justify-center bg-neutral-900 px-[15px] py-6">
@@ -205,9 +205,9 @@ export function VideoCanvas({
       )}
     </section>
   );
-}
+};
 
-function ActionPill({ icon: Icon, label, onClick }: { icon: typeof Camera; label: string; onClick: () => void }) {
+const ActionPill = ({ icon: Icon, label, onClick }: { icon: typeof Camera; label: string; onClick: () => void }) => {
   return (
     <button
       type="button"
@@ -218,13 +218,13 @@ function ActionPill({ icon: Icon, label, onClick }: { icon: typeof Camera; label
       {label}
     </button>
   );
-}
+};
 
-function ShortcutRow({ keys, action }: { keys: string; action: string }) {
+const ShortcutRow = ({ keys, action }: { keys: string; action: string }) => {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
       <span className="text-neutral-400">{action}</span>
       <kbd className="border border-white/30 bg-black px-1.5 py-0.5 font-mono text-[10px] text-white">{keys}</kbd>
     </div>
   );
-}
+};
