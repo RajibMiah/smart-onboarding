@@ -8,6 +8,7 @@ import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
 import type { CanvasAspectRatio } from "@/lib/editor/types";
 
 import { BlurOverlay } from "./canvas/BlurOverlay";
+import { ImageOverlay } from "./canvas/ImageOverlay";
 import { TextOverlay } from "./canvas/TextOverlay";
 
 const ASPECT_RATIO_CSS: Record<CanvasAspectRatio, string> = {
@@ -154,6 +155,7 @@ export const VideoCanvas = ({
           <>
             <BlurOverlay containerRef={canvasBoxRef} />
             <TextOverlay containerRef={canvasBoxRef} />
+            <ImageOverlay containerRef={canvasBoxRef} />
           </>
         )}
       </div>

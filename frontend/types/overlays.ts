@@ -34,10 +34,27 @@ export interface TextRegion {
   };
 }
 
+/** An uploaded image (logo, watermark, picture-in-picture graphic) positioned over the canvas. */
+export interface ImageOverlay {
+  id: string;
+  name: string;
+  /** Object URL for the uploaded image file. */
+  src: string;
+  startTime: number;
+  endTime: number;
+  bounds: BoundingBox;
+  /** Backend media_assets id, once uploaded — null until the background upload resolves. */
+  mediaAssetId: string | null;
+}
+
 export const blurRegionDuration = (region: BlurRegion): number => {
   return Math.max(0, region.endTime - region.startTime);
 };
 
 export const textRegionDuration = (region: TextRegion): number => {
   return Math.max(0, region.endTime - region.startTime);
+};
+
+export const imageOverlayDuration = (overlay: ImageOverlay): number => {
+  return Math.max(0, overlay.endTime - overlay.startTime);
 };

@@ -117,7 +117,10 @@ const StudioPageContent = () => {
           }
         }
 
-        loadProject({ clipId, tracks, zoomRegions, blurRegions, textRegions });
+        // Image overlays aren't part of the backend's per-clip resume payload yet
+        // (no matching timeline-track type there) — only the local IndexedDB
+        // draft flow (`useStudioPersistence`) round-trips them today.
+        loadProject({ clipId, tracks, zoomRegions, blurRegions, textRegions, imageOverlays: [] });
       } catch {
         if (!cancelled) toast.show("Couldn't load that clip for editing.");
       }

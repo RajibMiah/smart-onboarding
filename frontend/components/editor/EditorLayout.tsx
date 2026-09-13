@@ -9,15 +9,16 @@ import { Toast } from "@/components/ui/Toast";
 import { useEditor } from "@/context/EditorContext";
 import { useMediaIngestion } from "@/hooks/useMediaIngestion";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
+import { useModal } from "@/hooks/useModal";
 import { useStudioTool } from "@/hooks/useStudioTool";
 import { useToast } from "@/hooks/useToast";
-import { probeMediaDuration } from "@/lib/editor/media-utils";
 import type { StudioTool } from "@/types/studio";
 
 import { StudioDrawer } from "./StudioDrawer";
 import { StudioToolRail } from "./StudioToolRail";
 import { Timeline } from "./Timeline";
 import { VideoCanvas } from "./VideoCanvas";
+import { STUDIO_UPLOAD_MODAL_ID, StudioUploadModal } from "./modals/StudioUploadModal";
 import { AudioPanel } from "./panels/AudioPanel";
 import { AutoEditPanel } from "./panels/AutoEditPanel";
 import { BlurPanel } from "./panels/BlurPanel";
@@ -44,6 +45,7 @@ const EditorLayoutInner = () => {
   const toast = useToast();
   const { ingest } = useMediaIngestion();
   const studioTool = useStudioTool("media");
+  const uploadModal = useModal(STUDIO_UPLOAD_MODAL_ID);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const studioRef = useRef<HTMLDivElement>(null);
@@ -62,25 +64,6 @@ const EditorLayoutInner = () => {
   }, [recorder.error, toast]);
 
   const openMediaPanel = useCallback(() => studioTool.openTool("media"), [studioTool]);
-
-  const handleUploadFiles = useCallback(
-    async (files: FileList) => {
-      for (const file of Array.from(files)) {
-        if (file.type === "application/pdf") {
-          toast.show("PDF-to-recording conversion isn't available in this offline preview yet.");
-          continue;
-        }
-        const url = URL.createObjectURL(file);
-        try {
-          const duration = await probeMediaDuration(url);
-          ingest({ src: url, name: file.name, duration, type: "video" });
-        } catch {
-          toast.show(`Couldn't read "${file.name}" — is it a valid video file?`);
-        }
-      }
-    },
-    [ingest, toast],
-  );
 
   const handleTurnSlides = useCallback(() => {
     toast.show("Turning slides into a recording isn't available in this offline preview yet.");
@@ -151,7 +134,6 @@ const EditorLayoutInner = () => {
             onStartScreenRecording={recorder.startScreenRecording}
             onStartCameraRecording={recorder.startCameraRecording}
             onStopRecording={recorder.stopRecording}
-            onUploadFiles={handleUploadFiles}
             onTurnSlides={handleTurnSlides}
           />
         );
@@ -192,10 +174,7 @@ const EditorLayoutInner = () => {
         <VideoCanvas
           onStartScreenRecording={recorder.startScreenRecording}
           onStartCameraRecording={recorder.startCameraRecording}
-          onTriggerUpload={() => {
-            openMediaPanel();
-            toast.show('Use the "Upload" button in the Media panel to choose files.');
-          }}
+          onTriggerUpload={uploadModal.open}
           onOpenLibrary={openMediaPanel}
           onTurnSlides={handleTurnSlides}
         />
@@ -203,6 +182,7 @@ const EditorLayoutInner = () => {
 
       <Timeline onNotify={toast.show} onToggleFullscreen={toggleFullscreen} isFullscreen={isFullscreen} />
 
+      <StudioUploadModal />
       {toast.message && <Toast message={toast.message} />}
     </div>
   );

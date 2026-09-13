@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "@/context/EditorContext";
 import { indexedDbStorage } from "@/services/indexedDbStorage";
 import type { TimelineClip } from "@/lib/editor/types";
-import type { ProjectDraft, SaveStatus, StorageQuotaEstimate, TimelineClipDraft } from "@/types/storage";
+import type { ImageOverlay } from "@/types/overlays";
+import type { ImageOverlayDraft, ProjectDraft, SaveStatus, StorageQuotaEstimate, TimelineClipDraft } from "@/types/storage";
 
 const AUTO_SAVE_DEBOUNCE_MS = 1500;
 
@@ -81,20 +82,30 @@ export function useStudioPersistence({
         if (cancelled || !draft) return;
 
         const urlByMediaId = new Map<string, string>();
-        const tracks: TimelineClip[] = [];
+        const resolveSrc = async (mediaId: string): Promise<string | null> => {
+          const cached = urlByMediaId.get(mediaId);
+          if (cached) return cached;
+          const blob = await indexedDbStorage.getMediaBlob(mediaId);
+          if (!blob) return null; // Media evicted or never finished saving — skip rather than break the whole restore.
+          const src = URL.createObjectURL(blob);
+          urlByMediaId.set(mediaId, src);
+          restoredObjectUrlsRef.current.push(src);
+          return src;
+        };
 
+        const tracks: TimelineClip[] = [];
         for (const trackDraft of draft.timeline.tracks) {
           const { mediaId, ...rest } = trackDraft;
-          let src = urlByMediaId.get(mediaId);
-          if (!src) {
-            // Sequential on purpose — each lookup is a separate IDB read, fine at this scale.
-            const blob = await indexedDbStorage.getMediaBlob(mediaId);
-            if (!blob) continue; // Media evicted or never finished saving — skip rather than break the whole restore.
-            src = URL.createObjectURL(blob);
-            urlByMediaId.set(mediaId, src);
-            restoredObjectUrlsRef.current.push(src);
-          }
-          tracks.push({ ...rest, src });
+          // Sequential on purpose — each lookup is a separate IDB read, fine at this scale.
+          const src = await resolveSrc(mediaId);
+          if (src) tracks.push({ ...rest, src });
+        }
+
+        const imageOverlays: ImageOverlay[] = [];
+        for (const overlayDraft of draft.timeline.imageOverlays ?? []) {
+          const { mediaId, ...rest } = overlayDraft;
+          const src = await resolveSrc(mediaId);
+          if (src) imageOverlays.push({ ...rest, src });
         }
 
         if (cancelled) return;
@@ -104,6 +115,7 @@ export function useStudioPersistence({
           zoomRegions: draft.timeline.zoomRegions,
           blurRegions: draft.timeline.blurRegions,
           textRegions: draft.timeline.textRegions,
+          imageOverlays,
         });
       })
       .catch((error: unknown) => {
@@ -128,14 +140,14 @@ export function useStudioPersistence({
     };
   }, [projectId]);
 
-  const resolveMediaId = useCallback(async (clip: TimelineClip): Promise<string> => {
-    const cached = mediaIdBySrcRef.current.get(clip.src);
+  const resolveMediaId = useCallback(async (src: string, duration: number): Promise<string> => {
+    const cached = mediaIdBySrcRef.current.get(src);
     if (cached) return cached;
 
-    const blob = await fetch(clip.src).then((response) => response.blob());
+    const blob = await fetch(src).then((response) => response.blob());
     const mediaId = `media_${crypto.randomUUID()}`;
-    await indexedDbStorage.saveMediaBlob(mediaId, blob, clip.duration);
-    mediaIdBySrcRef.current.set(clip.src, mediaId);
+    await indexedDbStorage.saveMediaBlob(mediaId, blob, duration);
+    mediaIdBySrcRef.current.set(src, mediaId);
     return mediaId;
   }, []);
 
@@ -146,10 +158,18 @@ export function useStudioPersistence({
       const trackDrafts: TimelineClipDraft[] = [];
       for (const clip of state.tracks) {
         // Sequential on purpose — each clip's blob must finish saving before the draft references its id.
-        const mediaId = await resolveMediaId(clip);
+        const mediaId = await resolveMediaId(clip.src, clip.duration);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit `src` from the rest
         const { src, ...rest } = clip;
         trackDrafts.push({ ...rest, mediaId });
+      }
+
+      const overlayDrafts: ImageOverlayDraft[] = [];
+      for (const overlay of state.imageOverlays) {
+        const mediaId = await resolveMediaId(overlay.src, 0);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit `src` from the rest
+        const { src, ...rest } = overlay;
+        overlayDrafts.push({ ...rest, mediaId });
       }
 
       const now = new Date().toISOString();
@@ -164,8 +184,9 @@ export function useStudioPersistence({
           zoomRegions: state.zoomRegions,
           blurRegions: state.blurRegions,
           textRegions: state.textRegions,
+          imageOverlays: overlayDrafts,
         },
-        mediaIds: [...new Set(trackDrafts.map((track) => track.mediaId))],
+        mediaIds: [...new Set([...trackDrafts.map((track) => track.mediaId), ...overlayDrafts.map((overlay) => overlay.mediaId)])],
         createdAt: now,
         updatedAt: now,
       };
@@ -185,6 +206,7 @@ export function useStudioPersistence({
     }
   }, [
     state.tracks,
+    state.imageOverlays,
     state.canvasAspectRatio,
     state.zoomRegions,
     state.blurRegions,
@@ -207,7 +229,7 @@ export function useStudioPersistence({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [state.tracks, state.zoomRegions, state.blurRegions, state.textRegions, isRestoring, persistDraft]);
+  }, [state.tracks, state.zoomRegions, state.blurRegions, state.textRegions, state.imageOverlays, isRestoring, persistDraft]);
 
   useEffect(() => {
     refreshQuota();

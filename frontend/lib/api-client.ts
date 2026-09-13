@@ -149,14 +149,21 @@ export interface ApiDepartment {
 export type ClipStatus = "pending" | "processing" | "completed" | "failed";
 export type ClipVisibility = "draft" | "published" | "private";
 
+export type MediaAssetType = "video" | "audio" | "thumbnail" | "caption" | "overlay";
+
 export interface ApiMediaAsset {
   id: string;
-  clip: string;
-  asset_type: "video" | "audio" | "thumbnail" | "caption";
+  /** Null for an asset still sitting in the workspace's media bin, not yet attached to a saved clip. */
+  clip: string | null;
+  title: string;
+  asset_type: MediaAssetType;
   file_url: string;
   mime_type: string;
   file_size_bytes: number;
   resolution: string;
+  width: number | null;
+  height: number | null;
+  duration: number;
   framerate: string | null;
   status: "uploading" | "ready" | "failed";
   created_at: string;
@@ -349,17 +356,63 @@ export const clipsApi = {
 };
 
 // ---------------------------------------------------------------------------
-// Media assets (uploaded video/audio/thumbnail/caption files for a clip)
+// Media assets — the Studio's workspace-level media bin (video/audio/overlay
+// files uploaded independently of any clip) plus per-clip output assets.
 // ---------------------------------------------------------------------------
 
+export interface MediaAssetUploadInput {
+  /** Omit to upload into the workspace bin, unattached to any clip yet. */
+  clip?: string;
+  asset_type: MediaAssetType;
+  title?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  file: Blob;
+  filename?: string;
+  /** Called with 0-100 as the browser reports upload progress (requires XHR under the hood). */
+  onProgress?: (percent: number) => void;
+}
+
+function uploadMediaAssetXhr(input: MediaAssetUploadInput): Promise<ApiMediaAsset> {
+  const form = new FormData();
+  if (input.clip) form.set("clip", input.clip);
+  form.set("asset_type", input.asset_type);
+  if (input.title) form.set("title", input.title);
+  if (input.width !== undefined) form.set("width", String(input.width));
+  if (input.height !== undefined) form.set("height", String(input.height));
+  if (input.duration !== undefined) form.set("duration", String(input.duration));
+  form.set("file", input.file, input.filename ?? `${input.asset_type}.webm`);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_ROOT}/media-assets/`);
+    xhr.withCredentials = true;
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) input.onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+
+    xhr.onload = () => {
+      const data = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data as ApiMediaAsset);
+      } else {
+        const { message, fieldErrors } = extractMessage(data);
+        reject(new ApiError(xhr.status, message, fieldErrors));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError(0, "Upload failed — check your connection."));
+
+    xhr.send(form);
+  });
+}
+
 export const mediaAssetsApi = {
-  upload: (input: { clip: string; asset_type: ApiMediaAsset["asset_type"]; file: Blob; filename?: string }) => {
-    const form = new FormData();
-    form.set("clip", input.clip);
-    form.set("asset_type", input.asset_type);
-    form.set("file", input.file, input.filename ?? `${input.asset_type}.webm`);
-    return request<ApiMediaAsset>("/media-assets/", { method: "POST", body: form });
-  },
+  list: (params: Record<string, string> = {}) =>
+    request<Paginated<ApiMediaAsset>>(`/media-assets/?${new URLSearchParams(params).toString()}`),
+  /** Real multipart upload with live progress — plain `fetch` can't report upload progress, so this uses XHR directly. */
+  upload: uploadMediaAssetXhr,
   remove: (id: string) => request<void>(`/media-assets/${id}/`, { method: "DELETE" }),
 };
 

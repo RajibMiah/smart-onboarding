@@ -1,7 +1,7 @@
 /** IndexedDB persistence types for the APC Studio editor — see services/indexedDbStorage.ts. */
 
 import type { CanvasAspectRatio, TimelineClip } from "@/lib/editor/types";
-import type { BlurRegion, TextRegion } from "@/types/overlays";
+import type { BlurRegion, ImageOverlay, TextRegion } from "@/types/overlays";
 import type { ZoomRegion } from "@/types/zoom";
 
 export const STUDIO_DB_NAME = "apc_studio_db";
@@ -33,12 +33,16 @@ export type DraftStatus = "draft" | "processing" | "ready" | "published";
  */
 export type TimelineClipDraft = Omit<TimelineClip, "src"> & { mediaId: string };
 
+/** An `ImageOverlay` as stored on disk — `mediaId` replaces `src` the same way `TimelineClipDraft` does. */
+export type ImageOverlayDraft = Omit<ImageOverlay, "src"> & { mediaId: string };
+
 export interface ProjectTimelineState {
   tracks: TimelineClipDraft[];
   canvasAspectRatio: CanvasAspectRatio;
   zoomRegions: ZoomRegion[];
   blurRegions: BlurRegion[];
   textRegions: TextRegion[];
+  imageOverlays: ImageOverlayDraft[];
 }
 
 /** Store 2: one multi-track project draft, auto-saved as the editor changes. */

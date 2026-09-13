@@ -11,7 +11,7 @@ import {
 
 import { createTimelineClipFromAsset } from "@/lib/editor/create-clip";
 import { clipTimelineEnd, type CanvasAspectRatio, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
-import type { BlurRegion, BoundingBox, TextRegion } from "@/types/overlays";
+import type { BlurRegion, BoundingBox, ImageOverlay, TextRegion } from "@/types/overlays";
 import type { ZoomRegion, ZoomRegionBounds } from "@/types/zoom";
 
 const MAX_HISTORY = 50;
@@ -19,6 +19,7 @@ const DEFAULT_ZOOM_DURATION_SECONDS = 3;
 const DEFAULT_ZOOM_SCALE = 1.5;
 const DEFAULT_OVERLAY_DURATION_SECONDS = 3;
 const DEFAULT_BLUR_RADIUS = 16;
+const DEFAULT_IMAGE_OVERLAY_SIZE = 0.3;
 
 interface EditorState {
   tracks: TimelineClip[];
@@ -40,6 +41,8 @@ interface EditorState {
   selectedBlurId: string | null;
   textRegions: TextRegion[];
   selectedTextId: string | null;
+  imageOverlays: ImageOverlay[];
+  selectedImageOverlayId: string | null;
   history: { past: TimelineClip[][]; future: TimelineClip[][] };
   /** Set when this session was opened to resume editing a previously-saved clip, so
    *  Review knows to update that clip instead of creating a new one on save. */
@@ -80,6 +83,10 @@ type Action =
   | { type: "UPDATE_TEXT_REGION"; id: string; changes: Partial<TextRegion> }
   | { type: "REMOVE_TEXT_REGION"; id: string }
   | { type: "SELECT_TEXT_REGION"; id: string | null }
+  | { type: "ADD_IMAGE_OVERLAY"; overlay: ImageOverlay }
+  | { type: "UPDATE_IMAGE_OVERLAY"; id: string; changes: Partial<ImageOverlay> }
+  | { type: "REMOVE_IMAGE_OVERLAY"; id: string }
+  | { type: "SELECT_IMAGE_OVERLAY"; id: string | null }
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET_PROJECT" }
@@ -91,6 +98,7 @@ type Action =
       zoomRegions: ZoomRegion[];
       blurRegions: BlurRegion[];
       textRegions: TextRegion[];
+      imageOverlays: ImageOverlay[];
     };
 
 const INITIAL_STATE: EditorState = {
@@ -109,6 +117,8 @@ const INITIAL_STATE: EditorState = {
   selectedBlurId: null,
   textRegions: [],
   selectedTextId: null,
+  imageOverlays: [],
+  selectedImageOverlayId: null,
   history: { past: [], future: [] },
   projectClipId: null,
 };
@@ -301,6 +311,25 @@ const editorReducer = (state: EditorState, action: Action): EditorState => {
     case "SELECT_TEXT_REGION":
       return { ...state, selectedTextId: action.id };
 
+    case "ADD_IMAGE_OVERLAY":
+      return { ...state, imageOverlays: [...state.imageOverlays, action.overlay], selectedImageOverlayId: action.overlay.id };
+
+    case "UPDATE_IMAGE_OVERLAY":
+      return {
+        ...state,
+        imageOverlays: state.imageOverlays.map((overlay) => (overlay.id === action.id ? { ...overlay, ...action.changes } : overlay)),
+      };
+
+    case "REMOVE_IMAGE_OVERLAY":
+      return {
+        ...state,
+        imageOverlays: state.imageOverlays.filter((overlay) => overlay.id !== action.id),
+        selectedImageOverlayId: state.selectedImageOverlayId === action.id ? null : state.selectedImageOverlayId,
+      };
+
+    case "SELECT_IMAGE_OVERLAY":
+      return { ...state, selectedImageOverlayId: action.id };
+
     case "UNDO": {
       const previous = state.history.past.at(-1);
       if (!previous) return state;
@@ -337,6 +366,7 @@ const editorReducer = (state: EditorState, action: Action): EditorState => {
         zoomRegions: action.zoomRegions,
         blurRegions: action.blurRegions,
         textRegions: action.textRegions,
+        imageOverlays: action.imageOverlays,
         projectClipId: action.clipId,
       };
 
@@ -358,6 +388,7 @@ interface EditorContextValue {
   /** Blur/text regions covering the current playhead — several can be visible at once, unlike zoom. */
   activeBlurRegions: BlurRegion[];
   activeTextRegions: TextRegion[];
+  activeImageOverlays: ImageOverlay[];
 
   addClip: (clip: TimelineClip) => void;
   removeClip: (id: string) => void;
@@ -392,6 +423,10 @@ interface EditorContextValue {
   updateTextRegion: (id: string, changes: Partial<TextRegion>) => void;
   removeTextRegion: (id: string) => void;
   selectTextRegion: (id: string | null) => void;
+  addImageOverlay: (input: { src: string; bounds?: BoundingBox; mediaAssetId?: string | null }) => string;
+  updateImageOverlay: (id: string, changes: Partial<ImageOverlay>) => void;
+  removeImageOverlay: (id: string) => void;
+  selectImageOverlay: (id: string | null) => void;
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
@@ -401,6 +436,7 @@ interface EditorContextValue {
     zoomRegions: ZoomRegion[];
     blurRegions: BlurRegion[];
     textRegions: TextRegion[];
+    imageOverlays: ImageOverlay[];
   }) => void;
 }
 
@@ -511,12 +547,48 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
   );
   const removeTextRegion = useCallback((id: string) => dispatch({ type: "REMOVE_TEXT_REGION", id }), []);
   const selectTextRegion = useCallback((id: string | null) => dispatch({ type: "SELECT_TEXT_REGION", id }), []);
+  const addImageOverlay = useCallback(
+    (input: { src: string; bounds?: BoundingBox; mediaAssetId?: string | null }) => {
+      const id = crypto.randomUUID();
+      dispatch({
+        type: "ADD_IMAGE_OVERLAY",
+        overlay: {
+          id,
+          name: `Overlay ${state.imageOverlays.length + 1}`,
+          src: input.src,
+          startTime: state.currentTime,
+          endTime: state.currentTime + DEFAULT_OVERLAY_DURATION_SECONDS,
+          bounds: input.bounds ?? {
+            x: (1 - DEFAULT_IMAGE_OVERLAY_SIZE) / 2,
+            y: (1 - DEFAULT_IMAGE_OVERLAY_SIZE) / 2,
+            width: DEFAULT_IMAGE_OVERLAY_SIZE,
+            height: DEFAULT_IMAGE_OVERLAY_SIZE,
+          },
+          mediaAssetId: input.mediaAssetId ?? null,
+        },
+      });
+      return id;
+    },
+    [state.currentTime, state.imageOverlays.length],
+  );
+  const updateImageOverlay = useCallback(
+    (id: string, changes: Partial<ImageOverlay>) => dispatch({ type: "UPDATE_IMAGE_OVERLAY", id, changes }),
+    [],
+  );
+  const removeImageOverlay = useCallback((id: string) => dispatch({ type: "REMOVE_IMAGE_OVERLAY", id }), []);
+  const selectImageOverlay = useCallback((id: string | null) => dispatch({ type: "SELECT_IMAGE_OVERLAY", id }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
   const loadProject = useCallback(
-    (payload: { clipId: string | null; tracks: TimelineClip[]; zoomRegions: ZoomRegion[]; blurRegions: BlurRegion[]; textRegions: TextRegion[] }) =>
-      dispatch({ type: "LOAD_PROJECT", ...payload }),
+    (payload: {
+      clipId: string | null;
+      tracks: TimelineClip[];
+      zoomRegions: ZoomRegion[];
+      blurRegions: BlurRegion[];
+      textRegions: TextRegion[];
+      imageOverlays: ImageOverlay[];
+    }) => dispatch({ type: "LOAD_PROJECT", ...payload }),
     [],
   );
 
@@ -542,6 +614,10 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
     () => state.textRegions.filter((region) => state.currentTime >= region.startTime && state.currentTime < region.endTime),
     [state.textRegions, state.currentTime],
   );
+  const activeImageOverlays = useMemo(
+    () => state.imageOverlays.filter((overlay) => state.currentTime >= overlay.startTime && state.currentTime < overlay.endTime),
+    [state.imageOverlays, state.currentTime],
+  );
 
   const value = useMemo<EditorContextValue>(
     () => ({
@@ -555,6 +631,7 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       activeZoomRegion,
       activeBlurRegions,
       activeTextRegions,
+      activeImageOverlays,
       addClip,
       removeClip,
       updateClip,
@@ -588,6 +665,10 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       updateTextRegion,
       removeTextRegion,
       selectTextRegion,
+      addImageOverlay,
+      updateImageOverlay,
+      removeImageOverlay,
+      selectImageOverlay,
       undo,
       redo,
       resetProject,
@@ -602,6 +683,7 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       activeZoomRegion,
       activeBlurRegions,
       activeTextRegions,
+      activeImageOverlays,
       addClip,
       removeClip,
       updateClip,
@@ -635,6 +717,10 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       updateTextRegion,
       removeTextRegion,
       selectTextRegion,
+      addImageOverlay,
+      updateImageOverlay,
+      removeImageOverlay,
+      selectImageOverlay,
       undo,
       redo,
       resetProject,

@@ -1,16 +1,16 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState } from "react";
 import { Camera, FolderOpen, MoreVertical, ScanLine, Upload, UploadCloud } from "lucide-react";
 
+import { STUDIO_UPLOAD_MODAL_ID } from "@/components/editor/modals/StudioUploadModal";
 import { useEditor } from "@/context/EditorContext";
 import { useClickOutside } from "@/hooks/useClickOutside";
+import { useModal } from "@/hooks/useModal";
 import type { RecordingSource } from "@/hooks/useMediaRecorder";
 import { formatTimecode } from "@/lib/editor/media-utils";
 import { clipTimelineDuration, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
 import { cn } from "@/lib/utils";
-
-const ACCEPTED_UPLOAD_TYPES = ".mp4,.mov,.webm";
 
 interface MediaPanelProps {
   isRecording: boolean;
@@ -18,7 +18,6 @@ interface MediaPanelProps {
   onStartScreenRecording: () => void;
   onStartCameraRecording: () => void;
   onStopRecording: () => void;
-  onUploadFiles: (files: FileList) => void;
   onTurnSlides: () => void;
 }
 
@@ -30,7 +29,6 @@ export const MediaPanel = ({
   onStartScreenRecording,
   onStartCameraRecording,
   onStopRecording,
-  onUploadFiles,
   onTurnSlides,
 }: MediaPanelProps) => {
   const {
@@ -42,17 +40,12 @@ export const MediaPanel = ({
     removeClip,
     resetProject,
   } = useEditor();
+  const uploadModal = useModal(STUDIO_UPLOAD_MODAL_ID);
   const [activeTab, setActiveTab] = useState<DrawerTab>("timeline");
   const [menuOpen, setMenuOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files?.length) onUploadFiles(event.target.files);
-    event.target.value = "";
-  };
 
   return (
     <div className="flex h-full flex-col">
@@ -69,16 +62,8 @@ export const MediaPanel = ({
           active={isRecording && recordingSource === "camera"}
           onClick={isRecording && recordingSource === "camera" ? onStopRecording : onStartCameraRecording}
         />
-        <QuickActionButton icon={Upload} label="Upload" onClick={() => fileInputRef.current?.click()} />
+        <QuickActionButton icon={Upload} label="Upload" onClick={uploadModal.open} />
         <QuickActionButton icon={UploadCloud} label="Turn Slides into APC" onClick={onTurnSlides} />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPTED_UPLOAD_TYPES}
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
       </div>
 
       <div className="flex items-center justify-between border-b-2 border-black px-3">
