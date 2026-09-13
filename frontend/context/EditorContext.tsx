@@ -41,6 +41,9 @@ interface EditorState {
   textRegions: TextRegion[];
   selectedTextId: string | null;
   history: { past: TimelineClip[][]; future: TimelineClip[][] };
+  /** Set when this session was opened to resume editing a previously-saved clip, so
+   *  Review knows to update that clip instead of creating a new one on save. */
+  projectClipId: string | null;
 }
 
 type Action =
@@ -79,7 +82,16 @@ type Action =
   | { type: "SELECT_TEXT_REGION"; id: string | null }
   | { type: "UNDO" }
   | { type: "REDO" }
-  | { type: "RESET_PROJECT" };
+  | { type: "RESET_PROJECT" }
+  | {
+      type: "LOAD_PROJECT";
+      /** A real backend Clip id when resuming a saved clip; null for a local-only IndexedDB draft restore. */
+      clipId: string | null;
+      tracks: TimelineClip[];
+      zoomRegions: ZoomRegion[];
+      blurRegions: BlurRegion[];
+      textRegions: TextRegion[];
+    };
 
 const INITIAL_STATE: EditorState = {
   tracks: [],
@@ -98,19 +110,20 @@ const INITIAL_STATE: EditorState = {
   textRegions: [],
   selectedTextId: null,
   history: { past: [], future: [] },
+  projectClipId: null,
 };
 
 /** Deep-enough clone for history snapshots (clips are flat data + string[] arrays). */
-function cloneTracks(tracks: TimelineClip[]): TimelineClip[] {
+const cloneTracks = (tracks: TimelineClip[]): TimelineClip[] => {
   return tracks.map((clip) => ({ ...clip, thumbnails: [...clip.thumbnails], waveformPeaks: [...clip.waveformPeaks] }));
-}
+};
 
-function withHistorySnapshot(state: EditorState): EditorState["history"] {
+const withHistorySnapshot = (state: EditorState): EditorState["history"] => {
   const past = [...state.history.past, cloneTracks(state.tracks)].slice(-MAX_HISTORY);
   return { past, future: [] };
-}
+};
 
-function editorReducer(state: EditorState, action: Action): EditorState {
+const editorReducer = (state: EditorState, action: Action): EditorState => {
   switch (action.type) {
     case "ADD_CLIP": {
       return {
@@ -317,10 +330,20 @@ function editorReducer(state: EditorState, action: Action): EditorState {
     case "RESET_PROJECT":
       return INITIAL_STATE;
 
+    case "LOAD_PROJECT":
+      return {
+        ...INITIAL_STATE,
+        tracks: action.tracks,
+        zoomRegions: action.zoomRegions,
+        blurRegions: action.blurRegions,
+        textRegions: action.textRegions,
+        projectClipId: action.clipId,
+      };
+
     default:
       return state;
   }
-}
+};
 
 interface EditorContextValue {
   state: EditorState;
@@ -372,11 +395,18 @@ interface EditorContextValue {
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
+  loadProject: (payload: {
+    clipId: string | null;
+    tracks: TimelineClip[];
+    zoomRegions: ZoomRegion[];
+    blurRegions: BlurRegion[];
+    textRegions: TextRegion[];
+  }) => void;
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
 
-export function EditorProvider({ children }: { children: ReactNode }) {
+export const EditorProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(editorReducer, INITIAL_STATE);
 
   const addClip = useCallback((clip: TimelineClip) => dispatch({ type: "ADD_CLIP", clip }), []);
@@ -484,6 +514,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
+  const loadProject = useCallback(
+    (payload: { clipId: string | null; tracks: TimelineClip[]; zoomRegions: ZoomRegion[]; blurRegions: BlurRegion[]; textRegions: TextRegion[] }) =>
+      dispatch({ type: "LOAD_PROJECT", ...payload }),
+    [],
+  );
 
   const videoClips = useMemo(() => state.tracks.filter((clip) => clip.type === "video"), [state.tracks]);
   const audioClips = useMemo(() => state.tracks.filter((clip) => clip.type === "audio"), [state.tracks]);
@@ -556,6 +591,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       undo,
       redo,
       resetProject,
+      loadProject,
     }),
     [
       state,
@@ -602,14 +638,15 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       undo,
       redo,
       resetProject,
+      loadProject,
     ],
   );
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
-}
+};
 
-export function useEditor(): EditorContextValue {
+export const useEditor = (): EditorContextValue => {
   const ctx = useContext(EditorContext);
   if (!ctx) throw new Error("useEditor must be used within an <EditorProvider>");
   return ctx;
-}
+};
