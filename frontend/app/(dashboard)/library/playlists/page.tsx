@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ListVideo } from "lucide-react";
 
 import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
 import { PlaylistListItem } from "@/components/library/PlaylistListItem";
+import { ShareModal } from "@/components/library/ShareModal";
 import { NEW_PLAYLIST_MODAL_ID, NewPlaylistModal } from "@/components/modals/NewPlaylistModal";
 import { EditorialFilterBar } from "@/components/ui/EditorialFilterBar";
 import { Toast } from "@/components/ui/Toast";
@@ -29,6 +30,7 @@ const PlaylistsLibraryPage = () => {
     removePlaylist,
   } = usePlaylists();
   const { clips } = useClips();
+  const [shareTarget, setShareTarget] = useState<{ id: string; title: string } | null>(null);
 
   const filter = usePlaylistFilter({ playlists });
 
@@ -127,6 +129,7 @@ const PlaylistsLibraryPage = () => {
                 onChangeVisibility={() => handleChangeVisibility(playlist.id, playlist.visibility)}
                 onDuplicate={() => void duplicatePlaylist(playlist.id)}
                 onDelete={() => void removePlaylist(playlist.id)}
+                onShare={() => setShareTarget({ id: playlist.id, title: playlist.title })}
               />
             );
           })}
@@ -142,6 +145,14 @@ const PlaylistsLibraryPage = () => {
       />
 
       {toast.message && <Toast message={toast.message} />}
+
+      <ShareModal
+        isOpen={shareTarget !== null}
+        onClose={() => setShareTarget(null)}
+        contentType="playlist"
+        objectId={shareTarget?.id ?? ""}
+        contentTitle={shareTarget?.title ?? ""}
+      />
     </div>
   );
 };

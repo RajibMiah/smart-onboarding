@@ -181,6 +181,13 @@ export interface ApiClip {
   thumbnail_url: string;
   status: ClipStatus;
   visibility: ClipVisibility;
+  filter_settings: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    volumeGain: number;
+    noiseSuppression: boolean;
+  };
   assets: ApiMediaAsset[];
   created_at: string;
   updated_at: string;
@@ -338,6 +345,13 @@ export interface ClipWritePayload {
   visibility?: ClipVisibility;
   duration_seconds?: number;
   thumbnail_url?: string;
+  filter_settings?: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    volumeGain: number;
+    noiseSuppression: boolean;
+  };
 }
 
 export const clipsApi = {
@@ -420,7 +434,7 @@ export const mediaAssetsApi = {
 // Studio: timeline tracks + zoom/blur/text overlay regions
 // ---------------------------------------------------------------------------
 
-export type TrackType = "video" | "audio" | "zoom" | "blur" | "text";
+export type TrackType = "video" | "audio" | "zoom" | "blur" | "text" | "cut";
 
 export interface ApiZoomRegion {
   id: string;
@@ -460,6 +474,15 @@ export interface ApiTextOverlay {
   end_time: string;
 }
 
+export interface ApiCut {
+  id: string;
+  track: string;
+  cut_type: "keep" | "silence_speedup" | "cut";
+  speed_multiplier: string | null;
+  start_time: string;
+  end_time: string;
+}
+
 export interface ApiTimelineTrack {
   id: string;
   clip: string;
@@ -468,6 +491,7 @@ export interface ApiTimelineTrack {
   zoom_regions: ApiZoomRegion[];
   blur_regions: ApiBlurRegion[];
   text_overlays: ApiTextOverlay[];
+  cuts: ApiCut[];
   created_at: string;
 }
 
@@ -489,6 +513,10 @@ export const blurRegionsApi = {
 export const textOverlaysApi = {
   create: (payload: Omit<ApiTextOverlay, "id">) =>
     request<ApiTextOverlay>("/text-overlays/", { method: "POST", body: payload }),
+};
+
+export const cutsApi = {
+  create: (payload: Omit<ApiCut, "id">) => request<ApiCut>("/cuts/", { method: "POST", body: payload }),
 };
 
 // ---------------------------------------------------------------------------
@@ -551,4 +579,62 @@ export const teamsApi = {
 
 export const departmentsApi = {
   list: () => request<Paginated<ApiDepartment>>("/departments/"),
+};
+
+// ---------------------------------------------------------------------------
+// Send-with-Request sharing/feedback-request inbox
+// ---------------------------------------------------------------------------
+
+export type ApiRequestContentType = "clip" | "playlist";
+export type ApiRequestType = "feedback" | "approval" | "update_required" | "task";
+export type ApiRequestPriority = "low" | "medium" | "high" | "urgent";
+export type ApiRequestStatus = "pending" | "approved" | "changes_requested" | "completed" | "canceled";
+export type ApiRequestAction = "approve" | "request_changes" | "complete";
+
+export interface ApiMediaShareRequest {
+  id: string;
+  organization: string;
+  created_by: string;
+  created_by_name: string;
+  content_type: ApiRequestContentType;
+  object_id: string;
+  content_title: string;
+  content_thumbnail_url: string;
+  target_user: string | null;
+  target_user_name: string | null;
+  target_team: string | null;
+  target_team_name: string | null;
+  target_department: string | null;
+  target_department_name: string | null;
+  request_type: ApiRequestType;
+  priority: ApiRequestPriority;
+  status: ApiRequestStatus;
+  message: string;
+  due_date: string | null;
+  resolution_note: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MediaShareRequestPayload {
+  content_type: ApiRequestContentType;
+  object_id: string;
+  target_user?: string | null;
+  target_team?: string | null;
+  target_department?: string | null;
+  request_type: ApiRequestType;
+  priority: ApiRequestPriority;
+  message: string;
+  due_date?: string | null;
+}
+
+export const shareRequestsApi = {
+  list: (params: Record<string, string> = {}) =>
+    request<Paginated<ApiMediaShareRequest>>(`/requests/?${new URLSearchParams(params).toString()}`),
+  create: (payload: MediaShareRequestPayload) =>
+    request<ApiMediaShareRequest>("/requests/", { method: "POST", body: payload }),
+  remove: (id: string) => request<void>(`/requests/${id}/`, { method: "DELETE" }),
+  resolve: (id: string, action: ApiRequestAction, note = "") =>
+    request<ApiMediaShareRequest>(`/requests/${id}/action/`, { method: "POST", body: { action, note } }),
 };

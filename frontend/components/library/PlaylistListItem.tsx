@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Ban, Copy, Eye, ListVideo, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, Copy, Eye, ListVideo, Pencil, Plus, Share2, Trash2 } from "lucide-react";
 
 import { formatDuration, formatRelativeTime } from "@/lib/utils";
 import type { Playlist } from "@/types/playlist";
@@ -17,6 +17,7 @@ interface PlaylistListItemProps {
   onChangeVisibility?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  onShare?: () => void;
 }
 
 /** Clickable row -> `/library/playlists/[id]`; the action menu stops propagation so it doesn't also navigate. */
@@ -29,6 +30,7 @@ export const PlaylistListItem = ({
   onChangeVisibility,
   onDuplicate,
   onDelete,
+  onShare,
 }: PlaylistListItemProps) => {
   const router = useRouter();
 
@@ -95,6 +97,7 @@ export const PlaylistListItem = ({
             items={[
               { icon: Plus, label: "Add Clips", onClick: onAddClips },
               { icon: Pencil, label: "Rename", onClick: onRename },
+              { icon: Share2, label: "Share & Request", onClick: onShare },
               { icon: Eye, label: "Change Visibility", onClick: onChangeVisibility },
               { icon: Copy, label: "Duplicate", onClick: onDuplicate },
               { icon: Trash2, label: "Delete Playlist", tone: "danger", onClick: onDelete, dividerBefore: true },

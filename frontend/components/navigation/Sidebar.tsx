@@ -22,6 +22,7 @@ import {
 
 import { useUI } from "@/context/ui-context";
 import { useClickOutside } from "@/hooks/useClickOutside";
+import { usePendingRequestCount } from "@/hooks/useMediaRequests";
 import { cn } from "@/lib/utils";
 
 interface SubNavItem {
@@ -89,6 +90,7 @@ const isItemActive = (pathname: string, href: string): boolean => {
 /** Shared nav list — rendered once for desktop, once inside the mobile drawer. */
 const NavList = ({ collapsed }: { collapsed: boolean }) => {
   const pathname = usePathname();
+  const pendingRequestCount = usePendingRequestCount();
   // Manual expand/collapse for sections that *aren't* the active route —
   // the section containing the current page (e.g. "My Library" under any
   // /library/* route) is always forced open below, no state needed for that.
@@ -121,13 +123,23 @@ const NavList = ({ collapsed }: { collapsed: boolean }) => {
               <Link
                 href={href}
                 className={cn(
-                  "flex min-w-0 flex-1 items-center gap-3 px-3 py-2",
+                  "relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2",
                   collapsed && "justify-center px-0",
                 )}
                 title={collapsed ? label : undefined}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" />
                 {!collapsed && <span className="truncate">{label}</span>}
+                {id === "requests" && pendingRequestCount > 0 && (
+                  <span
+                    className={cn(
+                      "shrink-0 border border-black bg-black px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none text-white",
+                      collapsed ? "absolute right-1 top-1" : "ml-auto",
+                    )}
+                  >
+                    {pendingRequestCount}
+                  </span>
+                )}
               </Link>
               {!collapsed && subItems && (
                 <button
