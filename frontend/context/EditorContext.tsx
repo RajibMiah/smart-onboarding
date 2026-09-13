@@ -43,6 +43,9 @@ interface EditorState {
   selectedTextId: string | null;
   imageOverlays: ImageOverlay[];
   selectedImageOverlayId: string | null;
+  /** The Studio's own modal flag — it can't use the dashboard's `UIProvider`-based
+   *  `useModal`, since `/studio` sits outside that provider's route group. */
+  isUploadModalOpen: boolean;
   history: { past: TimelineClip[][]; future: TimelineClip[][] };
   /** Set when this session was opened to resume editing a previously-saved clip, so
    *  Review knows to update that clip instead of creating a new one on save. */
@@ -87,6 +90,7 @@ type Action =
   | { type: "UPDATE_IMAGE_OVERLAY"; id: string; changes: Partial<ImageOverlay> }
   | { type: "REMOVE_IMAGE_OVERLAY"; id: string }
   | { type: "SELECT_IMAGE_OVERLAY"; id: string | null }
+  | { type: "SET_UPLOAD_MODAL_OPEN"; open: boolean }
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET_PROJECT" }
@@ -119,6 +123,7 @@ const INITIAL_STATE: EditorState = {
   selectedTextId: null,
   imageOverlays: [],
   selectedImageOverlayId: null,
+  isUploadModalOpen: false,
   history: { past: [], future: [] },
   projectClipId: null,
 };
@@ -330,6 +335,9 @@ const editorReducer = (state: EditorState, action: Action): EditorState => {
     case "SELECT_IMAGE_OVERLAY":
       return { ...state, selectedImageOverlayId: action.id };
 
+    case "SET_UPLOAD_MODAL_OPEN":
+      return { ...state, isUploadModalOpen: action.open };
+
     case "UNDO": {
       const previous = state.history.past.at(-1);
       if (!previous) return state;
@@ -427,6 +435,8 @@ interface EditorContextValue {
   updateImageOverlay: (id: string, changes: Partial<ImageOverlay>) => void;
   removeImageOverlay: (id: string) => void;
   selectImageOverlay: (id: string | null) => void;
+  openUploadModal: () => void;
+  closeUploadModal: () => void;
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
@@ -577,6 +587,8 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
   );
   const removeImageOverlay = useCallback((id: string) => dispatch({ type: "REMOVE_IMAGE_OVERLAY", id }), []);
   const selectImageOverlay = useCallback((id: string | null) => dispatch({ type: "SELECT_IMAGE_OVERLAY", id }), []);
+  const openUploadModal = useCallback(() => dispatch({ type: "SET_UPLOAD_MODAL_OPEN", open: true }), []);
+  const closeUploadModal = useCallback(() => dispatch({ type: "SET_UPLOAD_MODAL_OPEN", open: false }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
@@ -669,6 +681,8 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       updateImageOverlay,
       removeImageOverlay,
       selectImageOverlay,
+      openUploadModal,
+      closeUploadModal,
       undo,
       redo,
       resetProject,
@@ -721,6 +735,8 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       updateImageOverlay,
       removeImageOverlay,
       selectImageOverlay,
+      openUploadModal,
+      closeUploadModal,
       undo,
       redo,
       resetProject,

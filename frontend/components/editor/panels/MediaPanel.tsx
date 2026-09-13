@@ -3,10 +3,8 @@
 import { useRef, useState } from "react";
 import { Camera, FolderOpen, MoreVertical, ScanLine, Upload, UploadCloud } from "lucide-react";
 
-import { STUDIO_UPLOAD_MODAL_ID } from "@/components/editor/modals/StudioUploadModal";
 import { useEditor } from "@/context/EditorContext";
 import { useClickOutside } from "@/hooks/useClickOutside";
-import { useModal } from "@/hooks/useModal";
 import type { RecordingSource } from "@/hooks/useMediaRecorder";
 import { formatTimecode } from "@/lib/editor/media-utils";
 import { clipTimelineDuration, type MediaAsset, type TimelineClip } from "@/lib/editor/types";
@@ -39,8 +37,8 @@ export const MediaPanel = ({
     addAssetToTimeline,
     removeClip,
     resetProject,
+    openUploadModal,
   } = useEditor();
-  const uploadModal = useModal(STUDIO_UPLOAD_MODAL_ID);
   const [activeTab, setActiveTab] = useState<DrawerTab>("timeline");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -62,7 +60,7 @@ export const MediaPanel = ({
           active={isRecording && recordingSource === "camera"}
           onClick={isRecording && recordingSource === "camera" ? onStopRecording : onStartCameraRecording}
         />
-        <QuickActionButton icon={Upload} label="Upload" onClick={uploadModal.open} />
+        <QuickActionButton icon={Upload} label="Upload" onClick={openUploadModal} />
         <QuickActionButton icon={UploadCloud} label="Turn Slides into APC" onClick={onTurnSlides} />
       </div>
 

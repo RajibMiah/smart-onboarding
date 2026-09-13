@@ -9,7 +9,6 @@ import { Toast } from "@/components/ui/Toast";
 import { useEditor } from "@/context/EditorContext";
 import { useMediaIngestion } from "@/hooks/useMediaIngestion";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
-import { useModal } from "@/hooks/useModal";
 import { useStudioTool } from "@/hooks/useStudioTool";
 import { useToast } from "@/hooks/useToast";
 import type { StudioTool } from "@/types/studio";
@@ -18,7 +17,7 @@ import { StudioDrawer } from "./StudioDrawer";
 import { StudioToolRail } from "./StudioToolRail";
 import { Timeline } from "./Timeline";
 import { VideoCanvas } from "./VideoCanvas";
-import { STUDIO_UPLOAD_MODAL_ID, StudioUploadModal } from "./modals/StudioUploadModal";
+import { StudioUploadModal } from "./modals/StudioUploadModal";
 import { AudioPanel } from "./panels/AudioPanel";
 import { AutoEditPanel } from "./panels/AutoEditPanel";
 import { BlurPanel } from "./panels/BlurPanel";
@@ -39,13 +38,23 @@ export const EditorLayout = () => {
 };
 
 const EditorLayoutInner = () => {
-  const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject, state, cancelZoomDrawing } =
-    useEditor();
+  const {
+    videoClips,
+    selectedClip,
+    removeClip,
+    undo,
+    redo,
+    togglePlay,
+    splitClipAtPlayhead,
+    resetProject,
+    state,
+    cancelZoomDrawing,
+    openUploadModal,
+  } = useEditor();
   const router = useRouter();
   const toast = useToast();
   const { ingest } = useMediaIngestion();
   const studioTool = useStudioTool("media");
-  const uploadModal = useModal(STUDIO_UPLOAD_MODAL_ID);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const studioRef = useRef<HTMLDivElement>(null);
@@ -174,7 +183,7 @@ const EditorLayoutInner = () => {
         <VideoCanvas
           onStartScreenRecording={recorder.startScreenRecording}
           onStartCameraRecording={recorder.startCameraRecording}
-          onTriggerUpload={uploadModal.open}
+          onTriggerUpload={openUploadModal}
           onOpenLibrary={openMediaPanel}
           onTurnSlides={handleTurnSlides}
         />

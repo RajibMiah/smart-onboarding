@@ -1,14 +1,12 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { AlertCircle, ArrowLeft, CheckCircle2, Film, Layers, Upload, X } from "lucide-react";
 
 import { withPortal } from "@/components/hoc/withPortal";
-import { useModal } from "@/hooks/useModal";
+import { useEditor } from "@/context/EditorContext";
 import { MEDIA_ACCEPT, OVERLAY_ACCEPT, useStudioUpload, type UploadKind, type UploadTask } from "@/hooks/useStudioUpload";
 import { formatBytes } from "@/lib/utils";
-
-export const STUDIO_UPLOAD_MODAL_ID = "studio-upload";
 
 const OPTIONS: {
   kind: UploadKind;
@@ -37,11 +35,32 @@ const OPTIONS: {
 ];
 
 function StudioUploadModalImpl() {
-  const { isOpen, close } = useModal(STUDIO_UPLOAD_MODAL_ID);
+  const { state, closeUploadModal } = useEditor();
+  const isOpen = state.isUploadModalOpen;
   const { tasks, uploadFiles, dismissTask } = useStudioUpload();
   const [selectedKind, setSelectedKind] = useState<UploadKind | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Same Escape-to-close + scroll-lock behavior the dashboard's `useModal` gives
+  // its modals — this one can't use that hook since `/studio` sits outside the
+  // dashboard's `UIProvider`, so it's replicated locally here instead.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closeUploadModal();
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, closeUploadModal]);
 
   if (!isOpen) return null;
 
@@ -51,7 +70,7 @@ function StudioUploadModalImpl() {
   function handleClose() {
     setSelectedKind(null);
     setIsDragOver(false);
-    close();
+    closeUploadModal();
   }
 
   function chooseOption(kind: UploadKind) {
@@ -70,10 +89,7 @@ function StudioUploadModalImpl() {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onKeyDown={(event) => event.key === "Escape" && handleClose()}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 animate-overlay-in" onClick={handleClose} aria-hidden="true" />
 
       <div
