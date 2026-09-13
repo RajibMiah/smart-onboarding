@@ -54,7 +54,7 @@ npm run dev
 
 ## Verify
 
-- Backend health check: `curl http://localhost:8000/api/health/`
+- Backend health check: `curl http://localhost:8000/api/v1/auth/health/`
   ```json
   {"status":"ok","database":{"status":"ok","vendor":"mysql","name":"smart_onboarding","error":null}}
   ```

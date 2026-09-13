@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -48,9 +49,17 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
     "corsheaders",
     "core",
+    "media",
+    "studio",
+    "collaboration",
 ]
+
+AUTH_USER_MODEL = "core.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -64,6 +73,7 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = "config.urls"
 
@@ -96,6 +106,8 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "onboarding_pass"),
         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
         "PORT": os.getenv("DB_PORT", "3306"),
+        # Persistent connections instead of reconnecting per-request.
+        "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
         "OPTIONS": {
             "charset": "utf8mb4",
         },
@@ -139,20 +151,74 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Local-disk media storage for recorded clips/thumbnails uploaded from the
+# Studio editor. A real deployment would swap this for S3/GCS-backed storage
+# behind a CDN, but local disk is sufficient for development.
+MEDIA_URL = "/media/"
+# Named "mediafiles", not "media" — the `media` Django app already owns that path.
+MEDIA_ROOT = BASE_DIR / "mediafiles"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "core.authentication.CookieJWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
 }
+
+# djangorestframework-simplejwt
+# https://django-rest-framework-simplejwt.readthedocs.io/en/latest/settings.html
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+# Cookie transport for JWTs, used by CookieJWTAuthentication and the
+# core.views login/refresh/logout endpoints. Keeps tokens out of client-side
+# JS (HttpOnly) while still working with the Next.js frontend on a
+# different origin during local development.
+JWT_AUTH_COOKIE = os.getenv("JWT_AUTH_COOKIE", "apc_access_token")
+JWT_AUTH_REFRESH_COOKIE = os.getenv("JWT_AUTH_REFRESH_COOKIE", "apc_refresh_token")
+JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "" if DEBUG else "True") == "True"
+JWT_COOKIE_SAMESITE = os.getenv("JWT_COOKIE_SAMESITE", "Lax")
 
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+# Console backend prints outgoing mail (invitation links, etc.) to the
+# server log instead of actually sending it — swap EMAIL_BACKEND for a real
+# SMTP/SES/etc. backend, and set the SMTP_* vars below, once there's a
+# provider to send through.
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "APC <no-reply@apc.local>")
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-    },
-}
+# Base URL of the Next.js frontend, used to build links embedded in emails
+# (e.g. the workspace-invitation accept link) — the backend has no other way
+# to know where the frontend is deployed.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
