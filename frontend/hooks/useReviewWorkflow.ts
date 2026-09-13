@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useEditor } from "@/context/EditorContext";
@@ -63,6 +63,9 @@ export const useReviewWorkflow = ({ initialTitle, hasMedia }: UseReviewWorkflowO
   const [description, setDescription] = useState("");
   const [steps, setSteps] = useState<DocumentationStep[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  /** Set once a clip is created within this session, so retrying after a failed
+   *  media upload updates that same clip instead of creating an orphaned duplicate. */
+  const pendingClipIdRef = useRef<string | null>(null);
 
   const processingStatus: ProcessingStatus = hasMedia ? timedStatus : "error";
 
@@ -147,30 +150,36 @@ export const useReviewWorkflow = ({ initialTitle, hasMedia }: UseReviewWorkflowO
         };
 
         let clipId: string;
-        if (existingClipId) {
-          // Re-editing a saved clip: replace its old assets/overlay tracks
-          // rather than accumulating duplicates on every save.
-          const existing = await clipsApi.get(existingClipId);
-          await clipsApi.update(existingClipId, clipPayload);
+        const targetClipId = existingClipId ?? pendingClipIdRef.current;
+        if (targetClipId) {
+          // Re-editing a saved clip (or retrying after a previous attempt's media
+          // upload failed): replace its old assets/overlay tracks rather than
+          // accumulating duplicates, or orphaning a video-less clip, on every save.
+          const existing = await clipsApi.get(targetClipId);
+          await clipsApi.update(targetClipId, clipPayload);
           await Promise.all(existing.assets.map((asset) => mediaAssetsApi.remove(asset.id)));
-          const existingTracks = await timelineTracksApi.listByClip(existingClipId);
+          const existingTracks = await timelineTracksApi.listByClip(targetClipId);
           await Promise.all(existingTracks.results.map((track) => timelineTracksApi.remove(track.id)));
-          clipId = existingClipId;
+          clipId = targetClipId;
         } else {
           const created = await clipsApi.create(clipPayload);
           clipId = created.id;
+          pendingClipIdRef.current = clipId;
         }
 
         const primaryClip = videoClips[0];
         if (primaryClip) {
-          try {
-            const videoBlob = await fetch(primaryClip.src).then((response) => response.blob());
-            await mediaAssetsApi.upload({ clip: clipId, asset_type: "video", file: videoBlob });
+          // Not wrapped in its own try/catch — a failed video upload must not be
+          // reported as a successful save. It propagates to the outer catch below,
+          // which surfaces the error and keeps the clip id above for a clean retry.
+          const videoBlob = await fetch(primaryClip.src).then((response) => response.blob());
+          await mediaAssetsApi.upload({ clip: clipId, asset_type: "video", file: videoBlob });
 
+          try {
             const thumbnailBlob = await captureVideoFrame(primaryClip.src);
             await clipsApi.uploadThumbnail(clipId, thumbnailBlob);
           } catch {
-            // Media upload is best-effort — the clip record itself already saved successfully.
+            // Thumbnail generation is best-effort — a missing thumbnail doesn't affect playback.
           }
         }
 
