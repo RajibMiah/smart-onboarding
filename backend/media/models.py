@@ -65,13 +65,18 @@ class Clip(TimeStampedModel):
 
 
 class MediaAsset(TimeStampedModel):
-    """A stored file (raw recording, transcoded output, thumbnail, caption track) for a clip."""
+    """A stored file for a workspace: a raw recording/upload, transcoded output,
+    thumbnail, caption track, or overlay graphic. `clip` is optional — an asset
+    uploaded into the Studio's media bin exists at the workspace level first
+    and is only linked to a `Clip` once (if ever) it's saved as part of one.
+    """
 
     class AssetType(models.TextChoices):
         VIDEO = "video", "Video"
         AUDIO = "audio", "Audio"
         THUMBNAIL = "thumbnail", "Thumbnail"
         CAPTION = "caption", "Caption"
+        OVERLAY = "overlay", "Overlay"
 
     class Status(models.TextChoices):
         UPLOADING = "uploading", "Uploading"
@@ -79,20 +84,31 @@ class MediaAsset(TimeStampedModel):
         FAILED = "failed", "Failed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    clip = models.ForeignKey(Clip, on_delete=models.CASCADE, related_name="assets")
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="media_assets")
+    uploader = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="uploaded_media_assets"
+    )
+    clip = models.ForeignKey(Clip, on_delete=models.CASCADE, related_name="assets", null=True, blank=True)
+    title = models.CharField(max_length=255, blank=True)
     asset_type = models.CharField(max_length=20, choices=AssetType.choices, default=AssetType.VIDEO)
     file = models.FileField(upload_to="clip-assets/%Y/%m/%d/", blank=True, null=True)
     file_url = models.URLField(blank=True, help_text="External CDN/S3 URL, used when no file is uploaded.")
     mime_type = models.CharField(max_length=80, blank=True)
     file_size_bytes = models.BigIntegerField(default=0)
     resolution = models.CharField(max_length=20, blank=True, help_text="e.g. 1920x1080")
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    duration = models.FloatField(default=0.0, help_text="Duration in seconds, for video/audio assets.")
     framerate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPLOADING)
 
     class Meta:
         db_table = "apc_clip_assets"
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["clip", "asset_type"])]
+        indexes = [
+            models.Index(fields=["clip", "asset_type"]),
+            models.Index(fields=["organization", "asset_type"]),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.get_asset_type_display()} for {self.clip.title}"
+        return self.title or f"{self.get_asset_type_display()} asset"

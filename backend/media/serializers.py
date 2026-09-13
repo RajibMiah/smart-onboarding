@@ -16,23 +16,33 @@ class MediaAssetSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "clip",
+            "title",
             "asset_type",
             "file",
             "file_url",
             "mime_type",
             "file_size_bytes",
             "resolution",
+            "width",
+            "height",
+            "duration",
             "framerate",
             "status",
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+        extra_kwargs = {"clip": {"required": False, "allow_null": True}}
 
     def get_file_url(self, obj: MediaAsset) -> str:
         if obj.file:
             request = self.context.get("request")
             return request.build_absolute_uri(obj.file.url) if request else obj.file.url
         return obj.file_url
+
+    def validate_clip(self, value: Clip | None) -> Clip | None:
+        if value is not None and value.organization_id != self.context["request"].user.organization_id:
+            raise serializers.ValidationError("This clip doesn't belong to your workspace.")
+        return value
 
     def create(self, validated_data: dict) -> MediaAsset:
         uploaded = validated_data.pop("file", None)

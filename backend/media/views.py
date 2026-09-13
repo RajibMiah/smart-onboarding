@@ -27,6 +27,9 @@ class ClipViewSet(viewsets.ModelViewSet):
 
 
 class MediaAssetViewSet(viewsets.ModelViewSet):
+    """Workspace media bin: assets uploaded here exist independently of any
+    `Clip` (see `MediaAsset.clip`) — the Studio's "Previous Medias" library."""
+
     serializer_class = MediaAssetSerializer
     permission_classes = [IsWorkspaceMember]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -34,4 +37,7 @@ class MediaAssetViewSet(viewsets.ModelViewSet):
     ordering_fields = ["created_at"]
 
     def get_queryset(self):
-        return MediaAsset.objects.filter(clip__organization_id=self.request.user.organization_id)
+        return MediaAsset.objects.filter(organization_id=self.request.user.organization_id)
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.user.organization, uploader=self.request.user)
