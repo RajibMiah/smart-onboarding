@@ -4,7 +4,16 @@ from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import Department, Organization, Team, TeamMembership, WorkspaceInvitation, WorkspaceMembership
+from .models import (
+    CustomRole,
+    Department,
+    Organization,
+    SystemRoleTier,
+    Team,
+    TeamMembership,
+    WorkspaceInvitation,
+    WorkspaceMembership,
+)
 
 User = get_user_model()
 
@@ -30,10 +39,60 @@ class TeamSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "organization", "created_at"]
 
 
+class CustomRoleSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source="department.name", read_only=True, default=None)
+
+    class Meta:
+        model = CustomRole
+        fields = [
+            "id",
+            "organization",
+            "name",
+            "description",
+            "created_by",
+            "department",
+            "department_name",
+            *CustomRole.CAPABILITY_FLAGS,
+            "created_at",
+        ]
+        read_only_fields = ["id", "organization", "created_by", "created_at"]
+
+    def validate_department(self, value: Department | None) -> Department | None:
+        if value is not None and value.organization_id != self.context["request"].user.organization_id:
+            raise serializers.ValidationError("That department doesn't belong to your workspace.")
+        return value
+
+
 class WorkspaceMembershipSerializer(serializers.ModelSerializer):
+    custom_role_name = serializers.CharField(source="custom_role.name", read_only=True, default=None)
+
     class Meta:
         model = WorkspaceMembership
-        fields = ["is_authorized", "is_creator", "is_global_admin", "is_content_manager", "tags"]
+        fields = [
+            "is_authorized",
+            "is_creator",
+            "is_global_admin",
+            "is_content_manager",
+            "tags",
+            "role_tier",
+            "custom_role",
+            "custom_role_name",
+            "revoked_at",
+        ]
+
+
+class MemberRoleUpdateSerializer(serializers.Serializer):
+    """PATCH payload for /users/<id>/role/ — role_tier and/or custom_role, either may be omitted."""
+
+    role_tier = serializers.ChoiceField(choices=SystemRoleTier.choices, required=False)
+    custom_role = serializers.PrimaryKeyRelatedField(
+        queryset=CustomRole.objects.all(), required=False, allow_null=True
+    )
+
+    def validate_custom_role(self, value: CustomRole | None) -> CustomRole | None:
+        if value is not None and value.organization_id != self.context["request"].user.organization_id:
+            raise serializers.ValidationError("That custom role doesn't belong to your workspace.")
+        return value
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -215,4 +274,5 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["is_creator"] = bool(membership and membership.is_creator)
         token["is_global_admin"] = bool(membership and membership.is_global_admin)
         token["is_content_manager"] = bool(membership and membership.is_content_manager)
+        token["role_tier"] = membership.role_tier if membership else None
         return token

@@ -119,6 +119,80 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         return f"{self.first_name} {self.last_name}".strip()
 
 
+class SystemRoleTier(models.TextChoices):
+    """A richer role label layered on top of the existing is_creator/is_global_admin/
+    is_content_manager flags — additive, not a replacement. Those three booleans stay
+    the source of truth for every existing permission check in this codebase (they're
+    baked into HasRolePermission usages, the JWT claims, and the invitation flow); this
+    enum only classifies roles that don't fit them, namely HR_MANAGER and CUSTOM.
+    OWNER/GLOBAL_ADMIN/CREATOR/VIEWER here are informational — assigning HR_MANAGER or
+    CUSTOM deliberately does NOT touch is_global_admin, which is exactly what keeps an
+    HR Manager or a custom role out of admin-gated endpoints without extra plumbing.
+    """
+
+    OWNER = "owner", "Workspace Owner"
+    GLOBAL_ADMIN = "global_admin", "Global Administrator"
+    HR_MANAGER = "hr_manager", "HR Manager"
+    PROJECT_MANAGER = "project_manager", "Project Manager"
+    TEAM_LEAD = "team_lead", "Team Lead"
+    CREATOR = "creator", "Creator"
+    VIEWER = "viewer", "Viewer"
+    CUSTOM = "custom", "Custom Defined Role"
+
+
+# The HR Manager tier's fixed capability set (see SystemRoleTier's docstring —
+# this tier is informational/additive, so its allowed flags are hardcoded here
+# rather than modeled as a CustomRole row).
+HR_MANAGER_CAPABILITIES = frozenset(
+    {"can_invite_users", "can_manage_teams", "can_manage_departments", "can_view_analytics", "can_revoke_access"}
+)
+
+
+class CustomRole(TimeStampedModel):
+    """An admin-defined job role with a specific set of granular capability flags."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="custom_roles")
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    # Optional: this role's authority only applies within one department.
+    # String reference: Department is defined later in this file.
+    department = models.ForeignKey(
+        "core.Department", on_delete=models.SET_NULL, null=True, blank=True, related_name="scoped_custom_roles"
+    )
+
+    can_invite_users = models.BooleanField(default=False)
+    can_manage_departments = models.BooleanField(default=False)
+    can_manage_teams = models.BooleanField(default=False)
+    can_assign_roles = models.BooleanField(default=False)
+    can_publish_public_clips = models.BooleanField(default=False)
+    can_manage_playlists = models.BooleanField(default=False)
+    can_approve_requests = models.BooleanField(default=False)
+    can_view_analytics = models.BooleanField(default=False)
+    can_revoke_access = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "apc_custom_roles"
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(fields=["organization", "name"], name="uniq_custom_role_per_org")]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.organization.name})"
+
+    CAPABILITY_FLAGS = (
+        "can_invite_users",
+        "can_manage_departments",
+        "can_manage_teams",
+        "can_assign_roles",
+        "can_publish_public_clips",
+        "can_manage_playlists",
+        "can_approve_requests",
+        "can_view_analytics",
+        "can_revoke_access",
+    )
+
+
 class WorkspaceMembership(TimeStampedModel):
     """Per-organization role flags for a user, used by HasRolePermission."""
 
@@ -130,12 +204,39 @@ class WorkspaceMembership(TimeStampedModel):
     is_content_manager = models.BooleanField(default=False)
     tags = models.JSONField(default=list, blank=True, help_text="Free-form organizational tags, e.g. 'Engineering'.")
 
+    # Richer role classification, additive on top of the booleans above (see
+    # SystemRoleTier's docstring).
+    role_tier = models.CharField(max_length=30, choices=SystemRoleTier.choices, default=SystemRoleTier.CREATOR)
+    custom_role = models.ForeignKey(
+        CustomRole, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_members"
+    )
+
+    # Revocation — reuses `is_authorized` as the single active/suspended flag
+    # (it already existed with exactly this intent) rather than adding a
+    # second, potentially-conflicting status field.
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="revoked_memberships"
+    )
+
     class Meta:
         db_table = "apc_workspace_memberships"
         indexes = [models.Index(fields=["organization"])]
 
     def __str__(self) -> str:
         return f"{self.user.email} @ {self.organization.name}"
+
+    def has_permission(self, capability_flag: str) -> bool:
+        """Dynamic capability check: role_tier/custom_role flags, gated on is_authorized."""
+        if not self.is_authorized:
+            return False
+        if self.is_global_admin or self.role_tier in (SystemRoleTier.OWNER, SystemRoleTier.GLOBAL_ADMIN):
+            return True
+        if self.role_tier == SystemRoleTier.HR_MANAGER and capability_flag in HR_MANAGER_CAPABILITIES:
+            return True
+        if self.custom_role_id and capability_flag in CustomRole.CAPABILITY_FLAGS:
+            return getattr(self.custom_role, capability_flag, False)
+        return False
 
 
 class Department(TimeStampedModel):

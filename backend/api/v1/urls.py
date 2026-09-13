@@ -9,7 +9,14 @@ from collaboration.views import (
     PlaylistViewSet,
     StepGuideViewSet,
 )
-from core.views import DepartmentViewSet, OrganizationViewSet, OrgUserViewSet, TeamViewSet, WorkspaceInvitationViewSet
+from core.views import (
+    CustomRoleViewSet,
+    DepartmentViewSet,
+    OrganizationViewSet,
+    OrgUserViewSet,
+    TeamViewSet,
+    WorkspaceInvitationViewSet,
+)
 from media.views import ClipViewSet, MediaAssetViewSet
 from sharing.views import MediaShareRequestViewSet, NotificationViewSet, SharedContentViewSet, SharedFeedView
 from studio.views import (
@@ -25,6 +32,7 @@ router.register("organizations", OrganizationViewSet, basename="organization")
 router.register("departments", DepartmentViewSet, basename="department")
 router.register("teams", TeamViewSet, basename="team")
 router.register("users", OrgUserViewSet, basename="org-user")
+router.register("custom-roles", CustomRoleViewSet, basename="custom-role")
 router.register("invitations", WorkspaceInvitationViewSet, basename="invitation")
 router.register("clips", ClipViewSet, basename="clip")
 router.register("media-assets", MediaAssetViewSet, basename="media-asset")

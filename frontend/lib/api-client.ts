@@ -96,12 +96,26 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 // Domain types (mirrors backend/*/serializers.py output)
 // ---------------------------------------------------------------------------
 
+export type ApiSystemRoleTier =
+  | "owner"
+  | "global_admin"
+  | "hr_manager"
+  | "project_manager"
+  | "team_lead"
+  | "creator"
+  | "viewer"
+  | "custom";
+
 export interface ApiWorkspaceMembership {
   is_authorized: boolean;
   is_creator: boolean;
   is_global_admin: boolean;
   is_content_manager: boolean;
   tags: string[];
+  role_tier: ApiSystemRoleTier;
+  custom_role: string | null;
+  custom_role_name: string | null;
+  revoked_at: string | null;
 }
 
 export interface ApiUser {
@@ -274,8 +288,54 @@ export interface ApiOrgUser {
   created_at: string;
 }
 
+export interface MemberRoleUpdatePayload {
+  role_tier?: ApiSystemRoleTier;
+  custom_role?: string | null;
+}
+
 export const usersApi = {
   list: () => request<Paginated<ApiOrgUser>>("/users/"),
+  updateRole: (id: string, payload: MemberRoleUpdatePayload) =>
+    request<ApiOrgUser>(`/users/${id}/role/`, { method: "PATCH", body: payload }),
+  revoke: (id: string) => request<ApiOrgUser>(`/users/${id}/revoke/`, { method: "POST" }),
+  reactivate: (id: string) => request<ApiOrgUser>(`/users/${id}/reactivate/`, { method: "POST" }),
+};
+
+export const CUSTOM_ROLE_CAPABILITY_FLAGS = [
+  "can_invite_users",
+  "can_manage_departments",
+  "can_manage_teams",
+  "can_assign_roles",
+  "can_publish_public_clips",
+  "can_manage_playlists",
+  "can_approve_requests",
+  "can_view_analytics",
+  "can_revoke_access",
+] as const;
+
+export type CustomRoleCapabilityFlag = (typeof CUSTOM_ROLE_CAPABILITY_FLAGS)[number];
+
+export type ApiCustomRole = {
+  id: string;
+  organization: string;
+  name: string;
+  description: string;
+  created_by: string | null;
+  department: string | null;
+  department_name: string | null;
+  created_at: string;
+} & Record<CustomRoleCapabilityFlag, boolean>;
+
+export type CustomRolePayload = {
+  name: string;
+  description?: string;
+  department?: string | null;
+} & Partial<Record<CustomRoleCapabilityFlag, boolean>>;
+
+export const customRolesApi = {
+  list: () => request<Paginated<ApiCustomRole>>("/custom-roles/"),
+  create: (payload: CustomRolePayload) => request<ApiCustomRole>("/custom-roles/", { method: "POST", body: payload }),
+  remove: (id: string) => request<void>(`/custom-roles/${id}/`, { method: "DELETE" }),
 };
 
 export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
