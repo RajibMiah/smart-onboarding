@@ -4,23 +4,19 @@ export interface LeaderboardRow {
   value: string;
 }
 
-interface StatLeaderboardProps {
+interface StatLeaderboardListProps {
   title: string;
   rows: LeaderboardRow[];
-  summary?: {
-    value: string;
-    label: string;
-  };
 }
 
-/** Bordered right-rail widget: a ranked table plus an optional headline stat block. */
-export const StatLeaderboard = ({ title, rows, summary }: StatLeaderboardProps) => {
+/** The ranked-table half of the widget — split out so callers can position it independently of the summary block (e.g. beside a page header). */
+export const StatLeaderboardList = ({ title, rows }: StatLeaderboardListProps) => {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="border-2 border-black">
-        <p className="border-b-2 border-black bg-neutral-100 p-2 text-sm font-bold uppercase tracking-wide text-black">
-          {title}
-        </p>
+    <div className="border-2 border-black">
+      <p className="border-b-2 border-black bg-neutral-100 p-2 text-sm font-bold uppercase tracking-wide text-black">
+        {title}
+      </p>
+      {rows.length > 0 && (
         <ul>
           {rows.map((row, index) => (
             <li
@@ -38,14 +34,41 @@ export const StatLeaderboard = ({ title, rows, summary }: StatLeaderboardProps) 
             </li>
           ))}
         </ul>
-      </div>
-
-      {summary && (
-        <div className="border-2 border-black bg-brand-yellow p-4">
-          <p className="text-3xl font-black tracking-tight text-black">{summary.value}</p>
-          <p className="mt-1 text-xs font-medium text-black/70">{summary.label}</p>
-        </div>
       )}
+    </div>
+  );
+};
+
+interface StatLeaderboardSummaryProps {
+  value: string;
+  label: string;
+}
+
+/** The headline-stat half of the widget. */
+export const StatLeaderboardSummary = ({ value, label }: StatLeaderboardSummaryProps) => {
+  return (
+    <div className="border-2 border-black bg-brand-yellow p-4">
+      <p className="text-3xl font-black tracking-tight text-black">{value}</p>
+      <p className="mt-1 text-xs font-medium text-black/70">{label}</p>
+    </div>
+  );
+};
+
+interface StatLeaderboardProps {
+  title: string;
+  rows: LeaderboardRow[];
+  summary?: {
+    value: string;
+    label: string;
+  };
+}
+
+/** Bordered right-rail widget: a ranked table plus an optional headline stat block, stacked together. */
+export const StatLeaderboard = ({ title, rows, summary }: StatLeaderboardProps) => {
+  return (
+    <div className="flex flex-col gap-4">
+      <StatLeaderboardList title={title} rows={rows} />
+      {summary && <StatLeaderboardSummary value={summary.value} label={summary.label} />}
     </div>
   );
 };

@@ -40,32 +40,22 @@ const DashboardPage = () => {
   ];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-      <div className="flex min-w-0 flex-1 flex-col gap-8">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-black">
-            {getTimeOfDayGreeting()}
-            {firstName ? `, ${firstName}` : ""} <span aria-hidden="true">👋</span>
-          </h1>
-          <button
-            type="button"
-            className="border-2 border-black bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-neutral-100"
-          >
-            Customize
-          </button>
-        </header>
+    <div className="mx-auto grid max-w-6xl grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-[1fr_18rem] lg:items-start">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-black">
+          {getTimeOfDayGreeting()}
+          {firstName ? `, ${firstName}` : ""} <span aria-hidden="true">👋</span>
+        </h1>
+        <button
+          type="button"
+          className="border-2 border-black bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-neutral-100"
+        >
+          Customize
+        </button>
+      </header>
 
-        <QuickActionCards />
-
-        <span className="w-fit border-2 border-black bg-brand-yellow px-3 py-1 text-xs font-bold text-black">
-          APC Support
-        </span>
-
-        <ContinueEditingDeck />
-        <ExploreSection />
-      </div>
-
-      <aside className="w-full shrink-0 lg:sticky lg:top-24 lg:w-72">
+      {/* Same grid row as the header above, so this whole section's top edge lines up with "Customize". */}
+      <aside className="row-span-2 lg:sticky lg:top-24">
         <StatLeaderboard
           title="Projects & Teams"
           rows={leaderboardRows.map((row, index) => ({
@@ -76,6 +66,17 @@ const DashboardPage = () => {
           summary={{ value: `${clips.length} clips`, label: "Total clips recorded across your workspace." }}
         />
       </aside>
+
+      <div className="flex min-w-0 flex-col gap-8">
+        <QuickActionCards />
+
+        <span className="w-fit border-2 border-black bg-brand-yellow px-3 py-1 text-xs font-bold text-black">
+          APC Support
+        </span>
+
+        <ContinueEditingDeck />
+        <ExploreSection />
+      </div>
     </div>
   );
 };
