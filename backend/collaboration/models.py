@@ -56,6 +56,7 @@ class PlaylistItem(models.Model):
         ordering = ["playlist", "position"]
         constraints = [
             models.UniqueConstraint(fields=["playlist", "clip"], name="uniq_clip_per_playlist"),
+            models.UniqueConstraint(fields=["playlist", "position"], name="uniq_position_per_playlist"),
         ]
 
     def __str__(self) -> str:

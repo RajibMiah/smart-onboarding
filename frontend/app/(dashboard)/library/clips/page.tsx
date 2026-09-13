@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Video } from "lucide-react";
 
 import { ClipListItem } from "@/components/library/ClipListItem";
 import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
+import { ShareModal } from "@/components/library/ShareModal";
 import { EditorialFilterBar, type FilterChip } from "@/components/ui/EditorialFilterBar";
 import { Toast } from "@/components/ui/Toast";
 import { useClips } from "@/hooks/useClips";
@@ -20,10 +21,31 @@ const STATUS_CHIPS: FilterChip[] = [
 ];
 
 const ClipsLibraryPage = () => {
+  return (
+    <Suspense>
+      <ClipsLibraryPageContent />
+    </Suspense>
+  );
+};
+export default ClipsLibraryPage;
+
+const ClipsLibraryPageContent = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const { clips, isLoading, error, removeClip, duplicateClip, renameClip } = useClips();
   const [view, setView] = useState<"cards" | "table">("cards");
+  const [shareTarget, setShareTarget] = useState<{ id: string; title: string } | null>(null);
+
+  // The Review page's overwrite-confirmation flow lands here with `?updated=1`
+  // right after replacing an existing clip in place — surface that as a
+  // one-shot toast, then scrub the param so a refresh doesn't repeat it.
+  useEffect(() => {
+    if (searchParams.get("updated") !== "1") return;
+    toast.show("✓ Clip updated successfully");
+    router.replace("/library/clips");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot on the param's presence, not on toast/router identity
+  }, [searchParams]);
 
   const filter = useLibraryFilter({
     items: clips,
@@ -111,13 +133,21 @@ const ClipsLibraryPage = () => {
               onMoveToProject={() => toast.show("Projects aren't available yet — check back soon.")}
               onDuplicate={() => void duplicateClip(clip.id)}
               onDelete={() => void removeClip(clip.id)}
+              onShare={() => setShareTarget({ id: clip.id, title: clip.title })}
             />
           ))}
         </div>
       )}
 
       {toast.message && <Toast message={toast.message} />}
+
+      <ShareModal
+        isOpen={shareTarget !== null}
+        onClose={() => setShareTarget(null)}
+        contentType="clip"
+        objectId={shareTarget?.id ?? ""}
+        contentTitle={shareTarget?.title ?? ""}
+      />
     </div>
   );
 };
-export default ClipsLibraryPage;

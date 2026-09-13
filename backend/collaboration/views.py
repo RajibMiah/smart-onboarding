@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import viewsets
 
 from core.permissions import IsProjectOwnerOrReadOnly, IsWorkspaceMember
@@ -31,6 +32,19 @@ class PlaylistItemViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return PlaylistItem.objects.filter(playlist__organization_id=self.request.user.organization_id)
+
+    def perform_create(self, serializer):
+        # `position` is server-assigned, not client-supplied — always append
+        # after every existing item in this playlist. `select_for_update`
+        # serializes concurrent adds to the same playlist so two simultaneous
+        # requests can't both read the same max() and collide on one slot,
+        # which the (playlist, position) unique constraint would otherwise reject.
+        playlist = serializer.validated_data["playlist"]
+        with transaction.atomic():
+            existing = PlaylistItem.objects.select_for_update().filter(playlist=playlist)
+            max_position = existing.order_by("-position").values_list("position", flat=True).first()
+            next_position = 0 if max_position is None else max_position + 1
+            serializer.save(position=next_position)
 
 
 class DocumentationPageViewSet(viewsets.ModelViewSet):
