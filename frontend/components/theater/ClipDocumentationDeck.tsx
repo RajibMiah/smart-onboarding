@@ -7,28 +7,27 @@ import { MessageSquare, Pencil, Send } from "lucide-react";
 import type { ApiStepGuide } from "@/lib/api-client";
 import { formatTimecode } from "@/lib/editor/media-utils";
 import { cn } from "@/lib/utils";
-import { DEFAULT_FILTER_SETTINGS, type ProjectMetadataPayload } from "@/types/project";
 
-type DeckTab = "steps" | "transcript" | "applied_edits" | "activity";
+type DeckTab = "steps" | "transcript" | "activity";
 
 const TABS: { id: DeckTab; label: string }[] = [
   { id: "steps", label: "Step-by-Step Guide" },
   { id: "transcript", label: "Interactive Transcript" },
-  { id: "applied_edits", label: "Applied Edits" },
   { id: "activity", label: "Activity / Feedback" },
 ];
 
 interface ClipDocumentationDeckProps {
   clipId: string;
   stepGuides: ApiStepGuide[];
-  project: ProjectMetadataPayload;
   onSeek: (seconds: number) => void;
   onOpenShare: () => void;
 }
 
-/** The SOP documentation deck under the player — step checklist, applied
- *  edits, and the direct re-edit trigger into Studio. */
-export const ClipDocumentationDeck = ({ clipId, stepGuides, project, onSeek, onOpenShare }: ClipDocumentationDeckProps) => {
+/** The SOP documentation deck under the player — step checklist, transcript,
+ *  feedback, and the direct re-edit trigger into Studio. No studio-edit
+ *  inspection here on purpose: that's a Studio/Review concern, not something
+ *  a Theater viewer needs. */
+export const ClipDocumentationDeck = ({ clipId, stepGuides, onSeek, onOpenShare }: ClipDocumentationDeckProps) => {
   const router = useRouter();
   const [tab, setTab] = useState<DeckTab>("steps");
 
@@ -64,7 +63,6 @@ export const ClipDocumentationDeck = ({ clipId, stepGuides, project, onSeek, onO
       <div className="p-4">
         {tab === "steps" && <StepByStepTab stepGuides={stepGuides} onSeek={onSeek} />}
         {tab === "transcript" && <EmptyDeckState text="An interactive transcript hasn't been generated for this clip yet." />}
-        {tab === "applied_edits" && <AppliedEditsTab project={project} onSeek={onSeek} />}
         {tab === "activity" && <ActivityTab onOpenShare={onOpenShare} />}
       </div>
     </div>
@@ -104,68 +102,6 @@ const StepByStepTab = ({ stepGuides, onSeek }: { stepGuides: ApiStepGuide[]; onS
     </ol>
   );
 };
-
-const AppliedEditsTab = ({ project, onSeek }: { project: ProjectMetadataPayload; onSeek: (seconds: number) => void }) => {
-  const { filters, cuts, zoomRegions, blurRegions, textOverlays } = project;
-  const appliedCuts = cuts.filter((cut) => cut.type !== "keep");
-  const totalEdits = zoomRegions.length + blurRegions.length + textOverlays.length + appliedCuts.length;
-
-  const filterChips: string[] = [];
-  if (filters.brightness !== DEFAULT_FILTER_SETTINGS.brightness) filterChips.push(`Brightness: ${filters.brightness}%`);
-  if (filters.contrast !== DEFAULT_FILTER_SETTINGS.contrast) filterChips.push(`Contrast: ${filters.contrast}%`);
-  if (filters.saturation !== DEFAULT_FILTER_SETTINGS.saturation) filterChips.push(`Saturation: ${filters.saturation}%`);
-  if (filters.noiseSuppression) filterChips.push("Noise Suppression: ON");
-
-  if (totalEdits === 0 && filterChips.length === 0) {
-    return <EmptyDeckState text="No studio edits were applied to this clip." />;
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      {filterChips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {filterChips.map((chip) => (
-            <span key={chip} className="border border-black bg-brand-yellow px-2 py-0.5 font-mono text-xs font-semibold text-black">
-              {chip}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="flex flex-col gap-1">
-        {zoomRegions.map((region) => (
-          <EditRow key={region.id} onClick={() => onSeek(region.startTime)}>
-            🔍 Zoom ({region.scale}x) — {formatTimecode(region.startTime)}
-          </EditRow>
-        ))}
-        {blurRegions.map((region) => (
-          <EditRow key={region.id} onClick={() => onSeek(region.startTime)}>
-            🎭 Blur ({region.blurRadius}px) — {formatTimecode(region.startTime)}
-          </EditRow>
-        ))}
-        {textOverlays.map((region) => (
-          <EditRow key={region.id} onClick={() => onSeek(region.startTime)}>
-            🔤 Text overlay — {formatTimecode(region.startTime)}
-          </EditRow>
-        ))}
-        {appliedCuts.map((cut) => (
-          <EditRow key={cut.id} onClick={() => onSeek(cut.startTime)}>
-            {cut.type === "cut" ? "✂️ Cut" : "⏩ Silence speedup"} — {formatTimecode(cut.startTime)}
-          </EditRow>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const EditRow = ({ children, onClick }: { children: React.ReactNode; onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="border border-black/20 px-2 py-1.5 text-left text-xs font-medium text-black transition hover:border-black hover:bg-brand-yellow/10"
-  >
-    {children}
-  </button>
-);
 
 const ActivityTab = ({ onOpenShare }: { onOpenShare: () => void }) => (
   <div className="flex flex-col items-center gap-3 py-6 text-center">

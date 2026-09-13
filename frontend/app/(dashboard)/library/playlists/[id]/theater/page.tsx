@@ -2,13 +2,14 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Download, Link2, ListVideo, Pencil, Share2 } from "lucide-react";
+import { ChevronLeft, Download, ListVideo, Pencil, Share2 } from "lucide-react";
 
 import { ItemActionMenu } from "@/components/library/ItemActionMenu";
 import { ShareModal } from "@/components/library/ShareModal";
 import { ClipDocumentationDeck } from "@/components/theater/ClipDocumentationDeck";
 import { NextUpOverlay } from "@/components/theater/NextUpOverlay";
 import { PlaylistQueueSidebar } from "@/components/theater/PlaylistQueueSidebar";
+import { VideoVolumeControl } from "@/components/theater/VideoVolumeControl";
 import { VideoReviewPlayer, type VideoReviewPlayerHandle } from "@/components/review/VideoReviewPlayer";
 import { Toast } from "@/components/ui/Toast";
 import { useUI } from "@/context/ui-context";
@@ -106,15 +107,6 @@ const TheaterView = ({ playlistId }: { playlistId: string }) => {
     }
   };
 
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.show("Link copied to clipboard.");
-    } catch {
-      toast.show("Couldn't copy the link.");
-    }
-  };
-
   if (theater.isLoading) {
     return <div className="flex min-h-screen items-center justify-center text-xs text-neutral-500">Loading runbook…</div>;
   }
@@ -162,14 +154,6 @@ const TheaterView = ({ playlistId }: { playlistId: string }) => {
             <Share2 className="h-3.5 w-3.5" />
             Share with Request
           </button>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="flex items-center gap-1.5 border border-black px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-neutral-100"
-          >
-            <Link2 className="h-3.5 w-3.5" />
-            Copy Link
-          </button>
           <ItemActionMenu
             itemLabel={theater.playlistTitle}
             items={[
@@ -198,7 +182,12 @@ const TheaterView = ({ playlistId }: { playlistId: string }) => {
         <div className="flex min-w-0 flex-col gap-4">
           <div className="relative">
             {theater.currentProject && (
-              <VideoReviewPlayer ref={playerRef} project={theater.currentProject} onEnded={handleClipEnded} />
+              <VideoReviewPlayer
+                ref={playerRef}
+                project={theater.currentProject}
+                onEnded={handleClipEnded}
+                autoPlayOnChange
+              />
             )}
 
             {nextUpSecondsLeft !== null && theater.hasNext && (
@@ -230,6 +219,7 @@ const TheaterView = ({ playlistId }: { playlistId: string }) => {
               >
                 5s ⟳
               </button>
+              <VideoVolumeControl getElement={() => playerRef.current?.getElement() ?? null} applyKey={theater.currentClip?.id} />
             </div>
 
             <div className="flex items-center gap-1">
@@ -269,11 +259,10 @@ const TheaterView = ({ playlistId }: { playlistId: string }) => {
             </div>
           </div>
 
-          {theater.currentClip && theater.currentProject && (
+          {theater.currentClip && (
             <ClipDocumentationDeck
               clipId={theater.currentClip.id}
               stepGuides={theater.currentStepGuides}
-              project={theater.currentProject}
               onSeek={seekPlayer}
               onOpenShare={() => setIsShareOpen(true)}
             />
