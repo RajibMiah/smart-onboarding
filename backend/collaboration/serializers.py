@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
+from media.serializers import ClipSerializer
+from studio.serializers import TimelineTrackSerializer
+
 from .models import DocumentationPage, PageClipItem, Playlist, PlaylistItem, StepGuide
 
 
@@ -64,6 +67,69 @@ class StepGuideSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+
+class TheaterClipSerializer(ClipSerializer):
+    """A clip as it plays inside the Playlist Theater: everything `ClipSerializer`
+    already exposes (assets, filter_settings) plus its non-destructive edit
+    tracks and step guides, so the theater view can hydrate playback and the
+    documentation deck from one nested payload instead of N follow-up
+    requests per clip."""
+
+    tracks = TimelineTrackSerializer(many=True, read_only=True)
+    step_guides = StepGuideSerializer(many=True, read_only=True)
+    author_name = serializers.CharField(source="author.full_name", read_only=True)
+
+    class Meta(ClipSerializer.Meta):
+        fields = [*ClipSerializer.Meta.fields, "tracks", "step_guides", "author_name"]
+
+
+class PlaylistTheaterItemSerializer(serializers.ModelSerializer):
+    clip = TheaterClipSerializer(read_only=True)
+
+    class Meta:
+        model = PlaylistItem
+        fields = ["id", "clip", "position"]
+
+
+class PlaylistTheaterSerializer(serializers.ModelSerializer):
+    """Full runbook payload for `GET /playlists/<id>/theater/` — the ordered
+    clip queue with each clip's complete studio edit layers already attached.
+    """
+
+    items = PlaylistTheaterItemSerializer(many=True, read_only=True)
+    owner_name = serializers.CharField(source="owner.full_name", read_only=True)
+    # The Playlist model has no department/team of its own (only an
+    # organization + owner) — the spec's "Department/Team" header badges are
+    # derived from whichever team the owner belongs to, the same lookup
+    # `OrgMemberSerializer.get_team`/`get_department` already uses elsewhere.
+    owner_department = serializers.SerializerMethodField()
+    owner_team = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Playlist
+        fields = [
+            "id",
+            "organization",
+            "owner",
+            "owner_name",
+            "owner_department",
+            "owner_team",
+            "title",
+            "description",
+            "visibility",
+            "items",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_owner_team(self, obj: Playlist) -> str | None:
+        membership = obj.owner.team_memberships.select_related("team").first()
+        return membership.team.name if membership else None
+
+    def get_owner_department(self, obj: Playlist) -> str | None:
+        membership = obj.owner.team_memberships.select_related("team__department").first()
+        return membership.team.department.name if membership and membership.team.department else None
 
 
 class PageClipItemSerializer(serializers.ModelSerializer):
