@@ -20,10 +20,15 @@ from django.db import models
 from core.models import Department, Organization, Team, TimeStampedModel
 
 
+class ShareContentType(models.TextChoices):
+    """Shared by every model here that points at a Clip or a Playlist."""
+
+    CLIP = "clip", "Clip"
+    PLAYLIST = "playlist", "Playlist"
+
+
 class MediaShareRequest(TimeStampedModel):
-    class ContentType(models.TextChoices):
-        CLIP = "clip", "Clip"
-        PLAYLIST = "playlist", "Playlist"
+    ContentType = ShareContentType
 
     class RequestType(models.TextChoices):
         FEEDBACK = "feedback", "Review & Feedback"
@@ -91,3 +96,83 @@ class MediaShareRequest(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.get_request_type_display()} request on {self.content_type} {self.object_id}"
+
+
+class SharedContent(TimeStampedModel):
+    """A plain share (no request attached) — the "Shared with me" feed's other half.
+
+    Sending a request through `MediaShareRequest` already implies a share,
+    so the feed endpoint (`sharing.views.shared_feed`) unions both tables;
+    this one exists for "just share the link" with no review/approval
+    workflow attached.
+    """
+
+    class Permission(models.TextChoices):
+        VIEW = "view", "Can View"
+        COMMENT = "comment", "Can View & Comment"
+        EDIT = "edit", "Can Edit"
+
+    ContentType = ShareContentType
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="shared_content")
+    shared_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="content_shared")
+
+    content_type = models.CharField(max_length=20, choices=ShareContentType.choices)
+    object_id = models.UUIDField(db_index=True)
+
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="content_shared_with_me"
+    )
+    target_team = models.ForeignKey(
+        Team, on_delete=models.SET_NULL, null=True, blank=True, related_name="content_shared_with_team"
+    )
+    target_department = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="content_shared_with_department"
+    )
+
+    permission = models.CharField(max_length=20, choices=Permission.choices, default=Permission.VIEW)
+
+    class Meta:
+        db_table = "apc_shared_content"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["organization"]),
+            models.Index(fields=["content_type", "object_id"]),
+        ]
+
+    def clean(self) -> None:
+        if not (self.target_user_id or self.target_team_id or self.target_department_id):
+            raise ValidationError("A share must target a user, team, or department.")
+
+    def __str__(self) -> str:
+        return f"{self.content_type} {self.object_id} shared by {self.shared_by_id}"
+
+
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        CONTENT_SHARED = "content_shared", "Content Shared"
+        REQUEST_CREATED = "request_created", "Request Created"
+        REQUEST_RESOLVED = "request_resolved", "Request Resolved"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="sent_notifications"
+    )
+    notification_type = models.CharField(max_length=30, choices=NotificationType.choices)
+
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    action_url = models.CharField(max_length=500, blank=True, default="")
+
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "apc_notifications"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["recipient", "is_read"])]
+
+    def __str__(self) -> str:
+        return f"{self.get_notification_type_display()} -> {self.recipient_id}"

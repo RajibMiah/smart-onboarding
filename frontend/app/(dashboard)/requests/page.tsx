@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Inbox, MessageSquare } from "lucide-react";
+import { Check, Inbox, MessageSquare, Plus } from "lucide-react";
 
+import { ShareModal } from "@/components/library/ShareModal";
 import { Toast } from "@/components/ui/Toast";
 import { useMediaRequests, type RequestInboxScope } from "@/hooks/useMediaRequests";
 import { useToast } from "@/hooks/useToast";
@@ -17,14 +18,16 @@ import {
 } from "@/types/sharing";
 import { cn } from "@/lib/utils";
 
-const TABS: { id: RequestInboxScope; label: string }[] = [
-  { id: "assigned_to_me", label: "Assigned to Me" },
-  { id: "created_by_me", label: "Created by Me" },
-  { id: "archived", label: "Archived / Completed" },
+type FilterOption = "all" | "open" | "assigned_to_me" | "created_by_me";
+
+const FILTER_OPTIONS: { id: FilterOption; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "open", label: "Open" },
+  { id: "assigned_to_me", label: "Assigned to me" },
+  { id: "created_by_me", label: "Requested by me" },
 ];
 
-const STATUS_OPTIONS: RequestStatus[] = ["pending", "approved", "changes_requested", "completed", "canceled"];
-const PRIORITY_OPTIONS: RequestPriority[] = ["low", "medium", "high", "urgent"];
+const OPEN_STATUSES = new Set(["pending", "changes_requested"]);
 
 const PRIORITY_DOT: Record<RequestPriority, string> = {
   low: "bg-neutral-400",
@@ -58,21 +61,32 @@ const targetLabel = (request: MediaShareRequest): string => {
   return "Unassigned";
 };
 
+const FILTER_TO_SCOPE: Record<FilterOption, RequestInboxScope> = {
+  all: "all",
+  open: "all",
+  assigned_to_me: "assigned_to_me",
+  created_by_me: "created_by_me",
+};
+
 const RequestsPage = () => {
   const router = useRouter();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<RequestInboxScope>("assigned_to_me");
-  const [statusFilter, setStatusFilter] = useState<"all" | RequestStatus>("all");
-  const [priorityFilter, setPriorityFilter] = useState<"all" | RequestPriority>("all");
+  const [filterOption, setFilterOption] = useState<FilterOption>("open");
+  const [search, setSearch] = useState("");
+  const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
 
-  const filters = useMemo(() => {
-    const next: Record<string, string> = {};
-    if (statusFilter !== "all") next.status = statusFilter;
-    if (priorityFilter !== "all") next.priority = priorityFilter;
-    return next;
-  }, [statusFilter, priorityFilter]);
+  const { requests: rawRequests, isLoading, error, resolveRequest } = useMediaRequests(FILTER_TO_SCOPE[filterOption]);
 
-  const { requests, isLoading, error, resolveRequest } = useMediaRequests(activeTab, filters);
+  const requests = useMemo(() => {
+    let items = filterOption === "open" ? rawRequests.filter((r) => OPEN_STATUSES.has(r.status)) : rawRequests;
+    if (search.trim()) {
+      const query = search.trim().toLowerCase();
+      items = items.filter(
+        (r) => r.contentTitle.toLowerCase().includes(query) || r.createdByName.toLowerCase().includes(query),
+      );
+    }
+    return items;
+  }, [rawRequests, filterOption, search]);
 
   const openReview = (request: MediaShareRequest) => {
     // The Review page has no deep-link support of its own — it only reads
@@ -99,52 +113,40 @@ const RequestsPage = () => {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5">
-      <h1 className="text-2xl font-bold tracking-tight text-black">Requests</h1>
-
-      <div className="flex border border-black">
-        {TABS.map((tab) => (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-black">💬 Requests</h1>
           <button
-            key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "flex-1 border-r border-black px-3 py-2 text-xs font-semibold uppercase tracking-wide last:border-r-0",
-              activeTab === tab.id ? "bg-black text-white" : "bg-white text-black hover:bg-neutral-100",
-            )}
+            onClick={() => setIsNewRequestOpen(true)}
+            className="flex items-center gap-1 border border-black px-3 py-1.5 text-xs font-bold text-black transition hover:bg-brand-yellow"
           >
-            {tab.label}
+            <Plus className="h-3.5 w-3.5" /> New Request
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="flex flex-wrap gap-3">
-        <select
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value as "all" | RequestStatus)}
-          aria-label="Filter by status"
-          className="border border-black bg-white px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-black"
-        >
-          <option value="all">All statuses</option>
-          {STATUS_OPTIONS.map((status) => (
-            <option key={status} value={status}>
-              {REQUEST_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={priorityFilter}
-          onChange={(event) => setPriorityFilter(event.target.value as "all" | RequestPriority)}
-          aria-label="Filter by priority"
-          className="border border-black bg-white px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-black"
-        >
-          <option value="all">All priorities</option>
-          {PRIORITY_OPTIONS.map((priority) => (
-            <option key={priority} value={priority}>
-              {REQUEST_PRIORITY_LABELS[priority]}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search for..."
+            aria-label="Search requests"
+            className="border border-black px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-black"
+          />
+          <select
+            value={filterOption}
+            onChange={(event) => setFilterOption(event.target.value as FilterOption)}
+            aria-label="Filter requests"
+            className="border border-black bg-white px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-black"
+          >
+            {FILTER_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && (
@@ -253,6 +255,8 @@ const RequestsPage = () => {
       )}
 
       {toast.message && <Toast message={toast.message} />}
+
+      <ShareModal isOpen={isNewRequestOpen} onClose={() => setIsNewRequestOpen(false)} />
     </div>
   );
 };

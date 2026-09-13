@@ -4,7 +4,38 @@ from collaboration.models import Playlist
 from core.models import Department, Team, User
 from media.models import Clip
 
-from .models import MediaShareRequest
+from .models import MediaShareRequest, Notification, SharedContent
+
+
+def resolve_shared_content(content_type: str, object_id, organization_id) -> Clip | Playlist | None:
+    model = Clip if content_type == MediaShareRequest.ContentType.CLIP else Playlist
+    return model.objects.filter(pk=object_id, organization_id=organization_id).first()
+
+
+def content_thumbnail_url(target: Clip | Playlist | None, request) -> str:
+    if not isinstance(target, Clip):
+        return ""
+    if target.thumbnail:
+        return request.build_absolute_uri(target.thumbnail.url) if request else target.thumbnail.url
+    return target.thumbnail_url
+
+
+def validate_share_target_and_content(attrs: dict, organization) -> None:
+    """Shared validation for anything shaped like {content_type, object_id, target_user/team/department}."""
+    if not (attrs.get("target_user") or attrs.get("target_team") or attrs.get("target_department")):
+        raise serializers.ValidationError("Must target a user, team, or department.")
+
+    content_type = attrs.get("content_type")
+    object_id = attrs.get("object_id")
+    if content_type is not None and object_id is not None:
+        model = Clip if content_type == MediaShareRequest.ContentType.CLIP else Playlist
+        if not model.objects.filter(pk=object_id, organization=organization).exists():
+            raise serializers.ValidationError("That clip or playlist doesn't exist in your workspace.")
+
+    for field_name in ("target_user", "target_team", "target_department"):
+        value = attrs.get(field_name)
+        if value is not None and value.organization_id != organization.id:
+            raise serializers.ValidationError(f"{field_name} must belong to your workspace.")
 
 
 class MediaShareRequestSerializer(serializers.ModelSerializer):
@@ -56,41 +87,15 @@ class MediaShareRequestSerializer(serializers.ModelSerializer):
         ]
 
     def get_content_title(self, obj: MediaShareRequest) -> str:
-        target = self._resolve_content(obj)
+        target = resolve_shared_content(obj.content_type, obj.object_id, obj.organization_id)
         return target.title if target else ""
 
     def get_content_thumbnail_url(self, obj: MediaShareRequest) -> str:
-        target = self._resolve_content(obj)
-        if not isinstance(target, Clip):
-            return ""
-        if target.thumbnail:
-            request = self.context.get("request")
-            return request.build_absolute_uri(target.thumbnail.url) if request else target.thumbnail.url
-        return target.thumbnail_url
-
-    def _resolve_content(self, obj: MediaShareRequest) -> Clip | Playlist | None:
-        model = Clip if obj.content_type == MediaShareRequest.ContentType.CLIP else Playlist
-        return model.objects.filter(pk=obj.object_id, organization_id=obj.organization_id).first()
+        target = resolve_shared_content(obj.content_type, obj.object_id, obj.organization_id)
+        return content_thumbnail_url(target, self.context.get("request"))
 
     def validate(self, attrs: dict) -> dict:
-        target_user = attrs.get("target_user")
-        target_team = attrs.get("target_team")
-        target_department = attrs.get("target_department")
-        if not (target_user or target_team or target_department):
-            raise serializers.ValidationError("A request must target a user, team, or department.")
-
-        organization = self.context["request"].user.organization
-        content_type = attrs.get("content_type")
-        object_id = attrs.get("object_id")
-        model = Clip if content_type == MediaShareRequest.ContentType.CLIP else Playlist
-        if object_id is not None and not model.objects.filter(pk=object_id, organization=organization).exists():
-            raise serializers.ValidationError("That clip or playlist doesn't exist in your workspace.")
-
-        for field_name, model_cls in (("target_user", User), ("target_team", Team), ("target_department", Department)):
-            value = attrs.get(field_name)
-            if value is not None and value.organization_id != organization.id:
-                raise serializers.ValidationError(f"{field_name} must belong to your workspace.")
-
+        validate_share_target_and_content(attrs, self.context["request"].user.organization)
         return attrs
 
 
@@ -103,3 +108,69 @@ class RequestActionSerializer(serializers.Serializer):
 
     action = serializers.ChoiceField(choices=list(ACTION_STATUS_MAP.keys()))
     note = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class SharedContentSerializer(serializers.ModelSerializer):
+    shared_by_name = serializers.CharField(source="shared_by.full_name", read_only=True)
+    shared_by_avatar_url = serializers.CharField(source="shared_by.avatar_url", read_only=True)
+    target_user_name = serializers.CharField(source="target_user.full_name", read_only=True)
+    target_team_name = serializers.CharField(source="target_team.name", read_only=True)
+    target_department_name = serializers.CharField(source="target_department.name", read_only=True)
+    content_title = serializers.SerializerMethodField()
+    content_thumbnail_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SharedContent
+        fields = [
+            "id",
+            "organization",
+            "shared_by",
+            "shared_by_name",
+            "shared_by_avatar_url",
+            "content_type",
+            "object_id",
+            "content_title",
+            "content_thumbnail_url",
+            "target_user",
+            "target_user_name",
+            "target_team",
+            "target_team_name",
+            "target_department",
+            "target_department_name",
+            "permission",
+            "created_at",
+        ]
+        read_only_fields = ["id", "organization", "shared_by", "created_at"]
+
+    def get_content_title(self, obj: SharedContent) -> str:
+        target = resolve_shared_content(obj.content_type, obj.object_id, obj.organization_id)
+        return target.title if target else ""
+
+    def get_content_thumbnail_url(self, obj: SharedContent) -> str:
+        target = resolve_shared_content(obj.content_type, obj.object_id, obj.organization_id)
+        return content_thumbnail_url(target, self.context.get("request"))
+
+    def validate(self, attrs: dict) -> dict:
+        validate_share_target_and_content(attrs, self.context["request"].user.organization)
+        return attrs
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    sender_name = serializers.CharField(source="sender.full_name", read_only=True)
+    sender_avatar_url = serializers.CharField(source="sender.avatar_url", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "sender",
+            "sender_name",
+            "sender_avatar_url",
+            "notification_type",
+            "title",
+            "message",
+            "action_url",
+            "is_read",
+            "created_at",
+        ]
+        read_only_fields = fields

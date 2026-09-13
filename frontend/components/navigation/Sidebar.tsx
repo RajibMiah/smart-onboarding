@@ -59,7 +59,10 @@ const NAV_ITEMS: NavItem[] = [
     label: "Shared with me",
     href: "/shared",
     icon: Share2,
-    subItems: [{ label: "Shared by me" }, { label: "Shared with me" }],
+    subItems: [
+      { label: "Shared by me", href: "/shared/by-me" },
+      { label: "Shared with me", href: "/shared" },
+    ],
   },
   { id: "requests", label: "Requests", href: "/requests", icon: Inbox },
   {

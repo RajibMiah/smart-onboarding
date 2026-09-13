@@ -638,3 +638,84 @@ export const shareRequestsApi = {
   resolve: (id: string, action: ApiRequestAction, note = "") =>
     request<ApiMediaShareRequest>(`/requests/${id}/action/`, { method: "POST", body: { action, note } }),
 };
+
+export type ApiSharePermission = "view" | "comment" | "edit";
+
+export interface ApiSharedContent {
+  id: string;
+  organization: string;
+  shared_by: string;
+  shared_by_name: string;
+  shared_by_avatar_url: string;
+  content_type: ApiRequestContentType;
+  object_id: string;
+  content_title: string;
+  content_thumbnail_url: string;
+  target_user: string | null;
+  target_user_name: string | null;
+  target_team: string | null;
+  target_team_name: string | null;
+  target_department: string | null;
+  target_department_name: string | null;
+  permission: ApiSharePermission;
+  created_at: string;
+}
+
+export interface SharedContentPayload {
+  content_type: ApiRequestContentType;
+  object_id: string;
+  target_user?: string | null;
+  target_team?: string | null;
+  target_department?: string | null;
+  permission: ApiSharePermission;
+}
+
+export const sharedContentApi = {
+  list: (params: Record<string, string> = {}) =>
+    request<Paginated<ApiSharedContent>>(`/shared-content/?${new URLSearchParams(params).toString()}`),
+  create: (payload: SharedContentPayload) =>
+    request<ApiSharedContent>("/shared-content/", { method: "POST", body: payload }),
+};
+
+export interface ApiSharedFeedItem {
+  id: string;
+  kind: "share" | "request";
+  content_type: ApiRequestContentType;
+  object_id: string;
+  content_title: string;
+  content_thumbnail_url: string;
+  actor_name: string;
+  actor_avatar_url: string;
+  target_label: string;
+  permission: ApiSharePermission | null;
+  request_type: ApiRequestType | null;
+  status: ApiRequestStatus | null;
+  created_at: string;
+}
+
+export const sharedFeedApi = {
+  list: (scope: "with_me" | "by_me") =>
+    request<{ count: number; results: ApiSharedFeedItem[] }>(`/sharing/feed/?scope=${scope}`),
+};
+
+export type ApiNotificationType = "content_shared" | "request_created" | "request_resolved";
+
+export interface ApiNotification {
+  id: string;
+  sender: string | null;
+  sender_name: string | null;
+  sender_avatar_url: string | null;
+  notification_type: ApiNotificationType;
+  title: string;
+  message: string;
+  action_url: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export const notificationsApi = {
+  list: (params: Record<string, string> = {}) =>
+    request<Paginated<ApiNotification>>(`/notifications/?${new URLSearchParams(params).toString()}`),
+  markRead: (id: string) => request<ApiNotification>(`/notifications/${id}/read/`, { method: "PATCH" }),
+  markAllRead: () => request<{ updated: number }>("/notifications/mark-all-read/", { method: "POST" }),
+};

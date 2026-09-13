@@ -36,7 +36,7 @@ const toMediaShareRequest = (api: ApiMediaShareRequest): MediaShareRequest => ({
   updatedAt: api.updated_at,
 });
 
-export type RequestInboxScope = "assigned_to_me" | "created_by_me" | "archived";
+export type RequestInboxScope = "all" | "assigned_to_me" | "created_by_me" | "archived";
 
 interface UseMediaRequestsResult {
   requests: MediaShareRequest[];
@@ -56,7 +56,9 @@ export function useMediaRequests(scope: RequestInboxScope, filters: Record<strin
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      const page = await shareRequestsApi.list({ filter: scope, ...filters });
+      // "all" omits the `filter` param entirely — the backend's own default
+      // (no scope clause, just org-filtered) already means "everything".
+      const page = await shareRequestsApi.list(scope === "all" ? filters : { filter: scope, ...filters });
       setRequests(page.results.map(toMediaShareRequest));
       setError(null);
     } catch (err) {

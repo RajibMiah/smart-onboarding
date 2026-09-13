@@ -11,7 +11,7 @@ from collaboration.views import (
 )
 from core.views import DepartmentViewSet, OrganizationViewSet, OrgUserViewSet, TeamViewSet, WorkspaceInvitationViewSet
 from media.views import ClipViewSet, MediaAssetViewSet
-from sharing.views import MediaShareRequestViewSet
+from sharing.views import MediaShareRequestViewSet, NotificationViewSet, SharedContentViewSet, SharedFeedView
 from studio.views import (
     BlurRegionViewSet,
     CutViewSet,
@@ -38,8 +38,11 @@ router.register("playlist-items", PlaylistItemViewSet, basename="playlist-item")
 router.register("pages", DocumentationPageViewSet, basename="page")
 router.register("step-guides", StepGuideViewSet, basename="step-guide")
 router.register("requests", MediaShareRequestViewSet, basename="media-request")
+router.register("shared-content", SharedContentViewSet, basename="shared-content")
+router.register("notifications", NotificationViewSet, basename="notification")
 
 urlpatterns = [
     path("auth/", include("core.urls")),
+    path("sharing/feed/", SharedFeedView.as_view(), name="shared-feed"),
     path("", include(router.urls)),
 ]
