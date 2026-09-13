@@ -16,7 +16,7 @@ interface UseAvatarUploadResult {
 }
 
 /** Client-side avatar upload: validates the file, previews it via an object URL — no server involved. */
-export function useAvatarUpload(): UseAvatarUploadResult {
+export const useAvatarUpload = (): UseAvatarUploadResult => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,4 +60,4 @@ export function useAvatarUpload(): UseAvatarUploadResult {
   }, []);
 
   return { previewUrl, error, fileInputRef, openFilePicker, handleFileChange, reset };
-}
+};

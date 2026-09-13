@@ -26,6 +26,9 @@ maps to a route in the code.
 ### Library — Pages
 ![Library — Pages](docs/screenshots/library-pages.png)
 
+### Library — Playlists
+![Library — Playlists](docs/screenshots/library-playlists.png)
+
 ### Video Studio
 ![Video Studio](docs/screenshots/studio.png)
 
@@ -40,9 +43,6 @@ maps to a route in the code.
 
 ### Analytics
 ![Analytics](docs/screenshots/analytics-dashboard.png)
-
-### Library — Playlists
-![Library — Playlists](docs/screenshots/library-playlists.png)
 
 ### Projects
 ![Projects](docs/screenshots/projects.png)

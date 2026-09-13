@@ -11,12 +11,20 @@ app/
 │   ├── library/
 │   │   ├── clips/page.tsx ........  Library — Clips (filter, sort, search, card grid)
 │   │   ├── pages/page.tsx ........  Library — Pages (filter, sort, search, card grid)
-│   │   └── playlists/page.tsx ....  Library — Playlists (placeholder)
+│   │   └── playlists/
+│   │       ├── page.tsx ..........  Library — Playlists (filter, sort, visibility, new-playlist modal)
+│   │       └── [id]/page.tsx .....  Playlist detail — its assigned clips
 │   ├── projects/page.tsx .........  Projects (placeholder)
 │   ├── requests/page.tsx .........  Requests (placeholder)
 │   ├── shared/page.tsx ...........  Shared with me (placeholder)
 │   └── settings/account/page.tsx    Account Settings — profile form, avatar upload, accordions
-├── studio/page.tsx ...............  Video Studio — screen/camera recording, timeline editor
+├── (auth)/                          shared shell: just the APC mark, no dashboard chrome
+│   ├── login/page.tsx ............  Login — credentials, Microsoft/Google SSO
+│   ├── signup/page.tsx ...........  Workspace signup — email + OTP verification
+│   └── reset-password/page.tsx ...  Password reset request
+├── studio/
+│   ├── page.tsx ...................  Video Studio — screen/camera recording, timeline editor
+│   └── review/page.tsx ............  Review & Publish — playlist assignment, description, step guide
 └── health/page.tsx ...............  Health Check — live frontend → backend → MySQL status
 ```
 

@@ -15,7 +15,7 @@ interface UseCarouselResult {
  * tracks whether there's more content off-screen in either direction, and
  * exposes prev/next helpers that scroll by ~90% of the visible width.
  */
-export function useCarousel(): UseCarouselResult {
+export const useCarousel = (): UseCarouselResult => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
@@ -59,4 +59,4 @@ export function useCarousel(): UseCarouselResult {
     canScrollPrev,
     canScrollNext,
   };
-}
+};

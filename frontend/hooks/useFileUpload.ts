@@ -28,7 +28,7 @@ interface UseFileUploadResult {
  * simulated progress lifecycle (no real network call — this is the frontend
  * scaffold; wiring to the backend upload endpoint lands in a later phase).
  */
-export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUploadResult {
+export const useFileUpload = (options: UseFileUploadOptions = {}): UseFileUploadResult => {
   const {
     acceptedExtensions = ACCEPTED_UPLOAD_EXTENSIONS,
     maxSizeBytes = MAX_UPLOAD_SIZE_BYTES,
@@ -152,4 +152,4 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
   }, []);
 
   return { items, addFiles, removeItem, cancelItem, retryItem, clearAll };
-}
+};

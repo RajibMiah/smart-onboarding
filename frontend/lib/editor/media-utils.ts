@@ -8,7 +8,7 @@
  * once (the file's duration/cues aren't finalized in the container) — so we
  * seek to a far-future time and read back the clamped, now-correct value.
  */
-export function probeMediaDuration(url: string): Promise<number> {
+export const probeMediaDuration = (url: string): Promise<number> => {
   return new Promise((resolve, reject) => {
     const el = document.createElement("video");
     el.preload = "metadata";
@@ -41,19 +41,19 @@ export function probeMediaDuration(url: string): Promise<number> {
       reject(new Error("Could not read media duration."));
     };
   });
-}
+};
 
 /** Infers a container extension (without the dot) from a filename or URL. */
-export function inferExtension(nameOrUrl: string, fallback = "webm"): string {
+export const inferExtension = (nameOrUrl: string, fallback = "webm"): string => {
   const match = /\.([a-zA-Z0-9]+)(?:\?.*)?$/.exec(nameOrUrl);
   return match ? match[1].toLowerCase() : fallback;
-}
+};
 
 /** Formats seconds as `MM:SS.d` (matching the timeline's transport readout). */
-export function formatTimecode(totalSeconds: number): string {
+export const formatTimecode = (totalSeconds: number): string => {
   const safe = Number.isFinite(totalSeconds) && totalSeconds > 0 ? totalSeconds : 0;
   const minutes = Math.floor(safe / 60);
   const seconds = Math.floor(safe % 60);
   const tenths = Math.floor((safe * 10) % 10);
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${tenths}`;
-}
+};

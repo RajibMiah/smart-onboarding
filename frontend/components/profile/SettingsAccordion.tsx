@@ -18,7 +18,7 @@ interface SettingsAccordionProps {
  * `0fr -> 1fr` technique (no JS height measurement, so it works for content
  * of any/changing height) rather than a headless-UI library dependency.
  */
-export function SettingsAccordion({ title, description, icon: Icon, defaultOpen = false, children }: SettingsAccordionProps) {
+export const SettingsAccordion = ({ title, description, icon: Icon, defaultOpen = false, children }: SettingsAccordionProps) => {
   const [open, setOpen] = useState(defaultOpen);
   const contentId = useId();
 
@@ -56,4 +56,4 @@ export function SettingsAccordion({ title, description, icon: Icon, defaultOpen 
       </div>
     </div>
   );
-}
+};

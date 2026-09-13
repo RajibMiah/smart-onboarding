@@ -27,7 +27,7 @@ interface AccountInfoFormProps {
   onPrivacyPolicyClick: () => void;
 }
 
-export function AccountInfoForm({
+export const AccountInfoForm = ({
   email,
   organisation,
   role,
@@ -38,7 +38,7 @@ export function AccountInfoForm({
   onSave,
   onDiscard,
   onPrivacyPolicyClick,
-}: AccountInfoFormProps) {
+}: AccountInfoFormProps) => {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -123,9 +123,9 @@ export function AccountInfoForm({
       )}
     </div>
   );
-}
+};
 
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
+const ReadOnlyField = ({ label, value }: { label: string; value: string }) => {
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium text-slate-500">{label}</span>
@@ -138,9 +138,9 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
       />
     </label>
   );
-}
+};
 
-function TextField({
+const TextField = ({
   label,
   value,
   onChange,
@@ -150,7 +150,7 @@ function TextField({
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
-}) {
+}) => {
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium text-slate-500">
@@ -165,9 +165,9 @@ function TextField({
       />
     </label>
   );
-}
+};
 
-function SelectField({
+const SelectField = ({
   label,
   value,
   options,
@@ -179,7 +179,7 @@ function SelectField({
   options: SelectOption[];
   onChange: (value: string) => void;
   required?: boolean;
-}) {
+}) => {
   const isValid = options.some((option) => option.value === value);
 
   return (
@@ -207,4 +207,4 @@ function SelectField({
       </div>
     </label>
   );
-}
+};

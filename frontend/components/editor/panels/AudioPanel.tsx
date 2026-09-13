@@ -10,7 +10,7 @@ interface AudioPanelProps {
 }
 
 /** Volume/mute genuinely control the selected clip; the rest are honest stubs (no AI backend yet). */
-export function AudioPanel({ onNotify }: AudioPanelProps) {
+export const AudioPanel = ({ onNotify }: AudioPanelProps) => {
   const { selectedClip, updateClip } = useEditor();
   const [noiseSuppression, setNoiseSuppression] = useState(false);
 
@@ -90,4 +90,4 @@ export function AudioPanel({ onNotify }: AudioPanelProps) {
       </button>
     </div>
   );
-}
+};

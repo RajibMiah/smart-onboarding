@@ -30,7 +30,7 @@ interface UseLibraryFilterResult<T> {
 }
 
 /** Client-side search (debounced), status filtering, and sorting for a library list. */
-export function useLibraryFilter<T>({
+export const useLibraryFilter = <T>({
   items,
   getTitle,
   getStatus,
@@ -38,7 +38,7 @@ export function useLibraryFilter<T>({
   getUpdatedAt,
   initialSort = "updated",
   initialStatus = "all",
-}: UseLibraryFilterOptions<T>): UseLibraryFilterResult<T> {
+}: UseLibraryFilterOptions<T>): UseLibraryFilterResult<T> => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<LibraryStatusFilter>(initialStatus);
@@ -76,4 +76,4 @@ export function useLibraryFilter<T>({
     items: filtered,
     totalCount: items.length,
   };
-}
+};

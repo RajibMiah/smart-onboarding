@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function LibraryPage() {
+const LibraryPage = () => {
   redirect("/library/clips");
-}
+};
+export default LibraryPage;

@@ -15,16 +15,16 @@ interface UseModalResult {
  * (only one modal id can be active at a time), and layers on the standard
  * modal side effects: Escape-to-close and background-scroll lock.
  */
-export function useModal(id: string): UseModalResult {
+export const useModal = (id: string): UseModalResult => {
   const { activeModal, openModal, closeModal } = useUI();
   const isOpen = activeModal === id;
 
   useEffect(() => {
     if (!isOpen) return;
 
-    function onKeyDown(event: KeyboardEvent) {
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeModal();
-    }
+    };
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -41,4 +41,4 @@ export function useModal(id: string): UseModalResult {
     open: () => openModal(id),
     close: closeModal,
   };
-}
+};

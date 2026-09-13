@@ -2,7 +2,7 @@ import { Folder } from "lucide-react";
 
 import { ComingSoon } from "@/components/dashboard/ComingSoon";
 
-export default function ProjectsPage() {
+const ProjectsPage = () => {
   return (
     <ComingSoon
       icon={Folder}
@@ -10,4 +10,5 @@ export default function ProjectsPage() {
       description="Group related recordings and pages into projects your team can browse together."
     />
   );
-}
+};
+export default ProjectsPage;

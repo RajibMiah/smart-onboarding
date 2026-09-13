@@ -17,8 +17,8 @@ export const STUDIO_TOOLS: StudioToolMeta[] = [
   { id: "settings", label: "Settings", icon: Settings, group: "overlay" },
 ];
 
-export function getStudioToolMeta(tool: StudioTool): StudioToolMeta {
+export const getStudioToolMeta = (tool: StudioTool): StudioToolMeta => {
   const meta = STUDIO_TOOLS.find((item) => item.id === tool);
   if (!meta) throw new Error(`Unknown studio tool: ${tool}`);
   return meta;
-}
+};

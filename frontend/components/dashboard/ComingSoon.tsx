@@ -8,7 +8,7 @@ interface ComingSoonProps {
 }
 
 /** Placeholder for sidebar routes not yet built — keeps navigation link-safe. */
-export function ComingSoon({ title, description, icon: Icon = Construction }: ComingSoonProps) {
+export const ComingSoon = ({ title, description, icon: Icon = Construction }: ComingSoonProps) => {
   return (
     <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 py-24 text-center">
       <Icon className="h-8 w-8 text-slate-400" />
@@ -16,4 +16,4 @@ export function ComingSoon({ title, description, icon: Icon = Construction }: Co
       <p className="max-w-sm text-sm text-slate-500">{description}</p>
     </div>
   );
-}
+};

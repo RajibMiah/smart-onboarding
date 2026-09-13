@@ -20,7 +20,7 @@ const DRAWER_WIDTH_PX = 320; // w-80
  * 0 and 320px so the collapse/expand actually animates (a component that's
  * unmounted when "closed" can't play a closing transition).
  */
-export function StudioDrawer({ activeTool, isOpen, onCollapse, children }: StudioDrawerProps) {
+export const StudioDrawer = ({ activeTool, isOpen, onCollapse, children }: StudioDrawerProps) => {
   const meta = getStudioToolMeta(activeTool);
   const Icon = meta.icon;
 
@@ -55,4 +55,4 @@ export function StudioDrawer({ activeTool, isOpen, onCollapse, children }: Studi
       </aside>
     </div>
   );
-}
+};

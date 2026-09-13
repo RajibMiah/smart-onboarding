@@ -2,21 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Cloud, Trash2 } from "lucide-react";
 
 import { Toast } from "@/components/ui/Toast";
-import { EditorProvider, useEditor } from "@/context/EditorContext";
+import { useEditor } from "@/context/EditorContext";
 import { useMediaIngestion } from "@/hooks/useMediaIngestion";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
+import { useModal } from "@/hooks/useModal";
 import { useStudioTool } from "@/hooks/useStudioTool";
 import { useToast } from "@/hooks/useToast";
-import { probeMediaDuration } from "@/lib/editor/media-utils";
 import type { StudioTool } from "@/types/studio";
 
 import { StudioDrawer } from "./StudioDrawer";
 import { StudioToolRail } from "./StudioToolRail";
 import { Timeline } from "./Timeline";
 import { VideoCanvas } from "./VideoCanvas";
+import { STUDIO_UPLOAD_MODAL_ID, StudioUploadModal } from "./modals/StudioUploadModal";
 import { AudioPanel } from "./panels/AudioPanel";
 import { AutoEditPanel } from "./panels/AutoEditPanel";
 import { BlurPanel } from "./panels/BlurPanel";
@@ -26,20 +28,24 @@ import { SettingsPanel } from "./panels/SettingsPanel";
 import { TextPanel } from "./panels/TextPanel";
 import { ZoomPanel } from "./panels/ZoomPanel";
 
-/** Complete Video Studio & Timeline Editor shell — self-contained, owns its own state provider. */
-export function EditorLayout() {
-  return (
-    <EditorProvider>
-      <EditorLayoutInner />
-    </EditorProvider>
-  );
-}
+/**
+ * Complete Video Studio & Timeline Editor shell. The `EditorProvider` now
+ * lives in `app/studio/layout.tsx` (a sibling to this page and to
+ * `/studio/review`) so the same editing session survives the client-side
+ * navigation to the review step instead of resetting.
+ */
+export const EditorLayout = () => {
+  return <EditorLayoutInner />;
+};
 
-function EditorLayoutInner() {
-  const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject } = useEditor();
+const EditorLayoutInner = () => {
+  const { videoClips, selectedClip, removeClip, undo, redo, togglePlay, splitClipAtPlayhead, resetProject, state, cancelZoomDrawing } =
+    useEditor();
+  const router = useRouter();
   const toast = useToast();
   const { ingest } = useMediaIngestion();
   const studioTool = useStudioTool("media");
+  const uploadModal = useModal(STUDIO_UPLOAD_MODAL_ID);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const studioRef = useRef<HTMLDivElement>(null);
@@ -59,25 +65,6 @@ function EditorLayoutInner() {
 
   const openMediaPanel = useCallback(() => studioTool.openTool("media"), [studioTool]);
 
-  const handleUploadFiles = useCallback(
-    async (files: FileList) => {
-      for (const file of Array.from(files)) {
-        if (file.type === "application/pdf") {
-          toast.show("PDF-to-recording conversion isn't available in this offline preview yet.");
-          continue;
-        }
-        const url = URL.createObjectURL(file);
-        try {
-          const duration = await probeMediaDuration(url);
-          ingest({ src: url, name: file.name, duration, type: "video" });
-        } catch {
-          toast.show(`Couldn't read "${file.name}" — is it a valid video file?`);
-        }
-      }
-    },
-    [ingest, toast],
-  );
-
   const handleTurnSlides = useCallback(() => {
     toast.show("Turning slides into a recording isn't available in this offline preview yet.");
   }, [toast]);
@@ -91,18 +78,18 @@ function EditorLayoutInner() {
   }, []);
 
   useEffect(() => {
-    function onChange() {
+    const onChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
-    }
+    };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
   // Global editor shortcuts — ignored while typing in a form field.
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
+    const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      if (target && (["INPUT", "TEXTAREA"].includes(target.tagName) || target.isContentEditable)) return;
 
       if (event.code === "Space") {
         event.preventDefault();
@@ -119,11 +106,14 @@ function EditorLayoutInner() {
       } else if (event.key.toLowerCase() === "s" && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         splitClipAtPlayhead();
+      } else if (event.key === "Escape" && state.isDrawingZoom) {
+        event.preventDefault();
+        cancelZoomDrawing();
       }
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [togglePlay, selectedClip, removeClip, undo, redo, splitClipAtPlayhead]);
+  }, [togglePlay, selectedClip, removeClip, undo, redo, splitClipAtPlayhead, state.isDrawingZoom, cancelZoomDrawing]);
 
   const handleDeleteProject = useCallback(() => {
     if (videoClips.length === 0) return;
@@ -132,7 +122,7 @@ function EditorLayoutInner() {
     }
   }, [videoClips.length, resetProject]);
 
-  function renderActivePanel(tool: StudioTool): ReactNode {
+  const renderActivePanel = (tool: StudioTool): ReactNode => {
     switch (tool) {
       case "auto-edit":
         return <AutoEditPanel onNotify={toast.show} />;
@@ -144,7 +134,6 @@ function EditorLayoutInner() {
             onStartScreenRecording={recorder.startScreenRecording}
             onStartCameraRecording={recorder.startCameraRecording}
             onStopRecording={recorder.stopRecording}
-            onUploadFiles={handleUploadFiles}
             onTurnSlides={handleTurnSlides}
           />
         );
@@ -163,11 +152,11 @@ function EditorLayoutInner() {
       default:
         return null;
     }
-  }
+  };
 
   return (
     <div ref={studioRef} className="flex h-screen flex-col bg-white">
-      <EditorHeader onDeleteProject={handleDeleteProject} onNext={() => toast.show("Publishing isn't available in this offline preview yet.")} />
+      <EditorHeader onDeleteProject={handleDeleteProject} onNext={() => router.push("/studio/review")} />
 
       <div className="flex min-h-0 flex-1">
         <StudioToolRail
@@ -185,10 +174,7 @@ function EditorLayoutInner() {
         <VideoCanvas
           onStartScreenRecording={recorder.startScreenRecording}
           onStartCameraRecording={recorder.startCameraRecording}
-          onTriggerUpload={() => {
-            openMediaPanel();
-            toast.show('Use the "Upload" button in the Media panel to choose files.');
-          }}
+          onTriggerUpload={uploadModal.open}
           onOpenLibrary={openMediaPanel}
           onTurnSlides={handleTurnSlides}
         />
@@ -196,12 +182,13 @@ function EditorLayoutInner() {
 
       <Timeline onNotify={toast.show} onToggleFullscreen={toggleFullscreen} isFullscreen={isFullscreen} />
 
+      <StudioUploadModal />
       {toast.message && <Toast message={toast.message} />}
     </div>
   );
-}
+};
 
-function EditorHeader({ onDeleteProject, onNext }: { onDeleteProject: () => void; onNext: () => void }) {
+const EditorHeader = ({ onDeleteProject, onNext }: { onDeleteProject: () => void; onNext: () => void }) => {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b-2 border-black px-4">
       <Link href="/" className="flex items-center gap-2">
@@ -232,4 +219,4 @@ function EditorHeader({ onDeleteProject, onNext }: { onDeleteProject: () => void
       </div>
     </header>
   );
-}
+};

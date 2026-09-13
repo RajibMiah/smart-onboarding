@@ -13,7 +13,7 @@ export const UPLOAD_MODAL_ID = "upload-files";
 
 const ACCEPT_ATTRIBUTE = ACCEPTED_UPLOAD_EXTENSIONS.join(",");
 
-function UploadModalImpl() {
+const UploadModalImpl = () => {
   const { isOpen, close } = useModal(UPLOAD_MODAL_ID);
   const { items, addFiles, removeItem, cancelItem, retryItem } = useFileUpload();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -121,7 +121,7 @@ function UploadModalImpl() {
       </div>
     </div>
   );
-}
+};
 
 interface UploadRowProps {
   item: UploadItem;
@@ -130,7 +130,7 @@ interface UploadRowProps {
   onRemove: (id: string) => void;
 }
 
-function UploadRow({ item, onCancel, onRetry, onRemove }: UploadRowProps) {
+const UploadRow = ({ item, onCancel, onRetry, onRemove }: UploadRowProps) => {
   return (
     <li className="flex items-center gap-3 rounded-lg border border-slate-100 p-3">
       <FileVideo className="h-5 w-5 shrink-0 text-slate-400" />
@@ -198,6 +198,6 @@ function UploadRow({ item, onCancel, onRetry, onRemove }: UploadRowProps) {
       </div>
     </li>
   );
-}
+};
 
 export const UploadModal = withPortal(UploadModalImpl);

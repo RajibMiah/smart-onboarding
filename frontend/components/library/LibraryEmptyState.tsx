@@ -10,7 +10,7 @@ interface LibraryEmptyStateProps {
 }
 
 /** Shown when a library list has nothing yet, or nothing matches the active search/filter. */
-export function LibraryEmptyState({ icon: Icon = Inbox, title, description, actionLabel, onAction }: LibraryEmptyStateProps) {
+export const LibraryEmptyState = ({ icon: Icon = Inbox, title, description, actionLabel, onAction }: LibraryEmptyStateProps) => {
   return (
     <div className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-black py-16 text-center">
       <span className="flex h-12 w-12 items-center justify-center border-2 border-black bg-white">
@@ -31,4 +31,4 @@ export function LibraryEmptyState({ icon: Icon = Inbox, title, description, acti
       )}
     </div>
   );
-}
+};

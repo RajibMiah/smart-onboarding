@@ -8,10 +8,10 @@ import { ClipListItem } from "@/components/library/ClipListItem";
 import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
 import { EditorialFilterBar, type FilterChip } from "@/components/ui/EditorialFilterBar";
 import { Toast } from "@/components/ui/Toast";
+import { useClips } from "@/hooks/useClips";
 import { useLibraryFilter } from "@/hooks/useLibraryFilter";
 import { useToast } from "@/hooks/useToast";
-import { MOCK_CLIPS } from "@/lib/library-mock-data";
-import { DEFAULT_SORT_OPTIONS, type ClipItem, type LibrarySortOption, type LibraryStatusFilter } from "@/types/library";
+import { DEFAULT_SORT_OPTIONS, type LibrarySortOption, type LibraryStatusFilter } from "@/types/library";
 
 const STATUS_CHIPS: FilterChip[] = [
   { value: "all", label: "All results" },
@@ -19,10 +19,10 @@ const STATUS_CHIPS: FilterChip[] = [
   { value: "draft", label: "Drafts" },
 ];
 
-export default function ClipsLibraryPage() {
+const ClipsLibraryPage = () => {
   const router = useRouter();
   const toast = useToast();
-  const [clips, setClips] = useState<ClipItem[]>(MOCK_CLIPS);
+  const { clips, isLoading, error, removeClip, duplicateClip, renameClip } = useClips();
   const [view, setView] = useState<"cards" | "table">("cards");
 
   const filter = useLibraryFilter({
@@ -33,34 +33,14 @@ export default function ClipsLibraryPage() {
     getUpdatedAt: (clip) => clip.updatedAt,
   });
 
-  const removeClip = useCallback((id: string) => {
-    setClips((prev) => prev.filter((clip) => clip.id !== id));
-  }, []);
-
-  const duplicateClip = useCallback((id: string) => {
-    setClips((prev) => {
-      const source = prev.find((clip) => clip.id === id);
-      if (!source) return prev;
-      const copy: ClipItem = {
-        ...source,
-        id: crypto.randomUUID(),
-        title: `${source.title} (copy)`,
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        views: 0,
-        likes: 0,
-        comments: 0,
-      };
-      return [copy, ...prev];
-    });
-  }, []);
-
-  const renameClip = useCallback((id: string, currentTitle: string) => {
-    const next = window.prompt("Rename clip", currentTitle)?.trim();
-    if (!next) return;
-    setClips((prev) => prev.map((clip) => (clip.id === id ? { ...clip, title: next, updatedAt: new Date().toISOString() } : clip)));
-  }, []);
+  const handleRename = useCallback(
+    (id: string, currentTitle: string) => {
+      const next = window.prompt("Rename clip", currentTitle)?.trim();
+      if (!next) return;
+      void renameClip(id, next);
+    },
+    [renameClip],
+  );
 
   const hasAnyClips = clips.length > 0;
 
@@ -98,10 +78,16 @@ export default function ClipsLibraryPage() {
       />
 
       <p className="text-xs text-neutral-500">
-        Showing {filter.items.length} of {filter.totalCount} clips
+        {isLoading ? "Loading clips…" : `Showing ${filter.items.length} of ${filter.totalCount} clips`}
       </p>
 
-      {filter.items.length === 0 ? (
+      {error && (
+        <div role="alert" className="border border-red-600 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {!isLoading && filter.items.length === 0 ? (
         <LibraryEmptyState
           icon={Video}
           title={hasAnyClips ? "No clips match your search" : "No clips yet"}
@@ -121,10 +107,10 @@ export default function ClipsLibraryPage() {
             <ClipListItem
               key={clip.id}
               clip={clip}
-              onRename={() => renameClip(clip.id, clip.title)}
+              onRename={() => handleRename(clip.id, clip.title)}
               onMoveToProject={() => toast.show("Projects aren't available yet — check back soon.")}
-              onDuplicate={() => duplicateClip(clip.id)}
-              onDelete={() => removeClip(clip.id)}
+              onDuplicate={() => void duplicateClip(clip.id)}
+              onDelete={() => void removeClip(clip.id)}
             />
           ))}
         </div>
@@ -133,4 +119,5 @@ export default function ClipsLibraryPage() {
       {toast.message && <Toast message={toast.message} />}
     </div>
   );
-}
+};
+export default ClipsLibraryPage;

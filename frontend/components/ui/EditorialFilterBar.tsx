@@ -18,9 +18,10 @@ export interface SelectFilter {
 }
 
 interface EditorialFilterBarProps {
-  chips: FilterChip[];
-  activeChip: string;
-  onChipChange: (value: string) => void;
+  /** Omit (along with `activeChip`/`onChipChange`) for a list that only needs the select dropdowns, e.g. Playlists. */
+  chips?: FilterChip[];
+  activeChip?: string;
+  onChipChange?: (value: string) => void;
   search: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
@@ -30,8 +31,8 @@ interface EditorialFilterBarProps {
 }
 
 /** Segmented filter chips + search + selects + cards/table toggle, all sharp-bordered. */
-export function EditorialFilterBar({
-  chips,
+export const EditorialFilterBar = ({
+  chips = [],
   activeChip,
   onChipChange,
   search,
@@ -40,28 +41,30 @@ export function EditorialFilterBar({
   selects = [],
   view,
   onViewChange,
-}: EditorialFilterBarProps) {
+}: EditorialFilterBarProps) => {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        {chips.map((chip) => {
-          const active = chip.value === activeChip;
-          return (
-            <button
-              key={chip.value}
-              type="button"
-              onClick={() => onChipChange(chip.value)}
-              aria-pressed={active}
-              className={cn(
-                "border-2 border-black px-3 py-1.5 text-sm font-semibold transition",
-                active ? "bg-black text-white" : "bg-white text-black hover:bg-neutral-100",
-              )}
-            >
-              {chip.label}
-            </button>
-          );
-        })}
-      </div>
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {chips.map((chip) => {
+            const active = chip.value === activeChip;
+            return (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => onChipChange?.(chip.value)}
+                aria-pressed={active}
+                className={cn(
+                  "border-2 border-black px-3 py-1.5 text-sm font-semibold transition",
+                  active ? "bg-black text-white" : "bg-white text-black hover:bg-neutral-100",
+                )}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-56 flex-1">
@@ -120,4 +123,4 @@ export function EditorialFilterBar({
       </div>
     </div>
   );
-}
+};

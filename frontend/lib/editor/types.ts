@@ -44,10 +44,10 @@ export interface MediaAsset {
 }
 
 /** Trimmed duration of a clip as it appears on the timeline. */
-export function clipTimelineDuration(clip: TimelineClip): number {
+export const clipTimelineDuration = (clip: TimelineClip): number => {
   return Math.max(0, clip.trimEnd - clip.trimStart);
-}
+};
 
-export function clipTimelineEnd(clip: TimelineClip): number {
+export const clipTimelineEnd = (clip: TimelineClip): number => {
   return clip.startOffset + clipTimelineDuration(clip);
-}
+};

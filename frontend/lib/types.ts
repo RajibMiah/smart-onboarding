@@ -17,23 +17,10 @@ export interface ContinuingItem {
   /** Video only */
   durationLabel?: string;
   thumbnailGradient?: string;
+  /** Video only — a real captured thumbnail, when the clip has one, shown instead of the gradient placeholder. */
+  thumbnailUrl?: string;
   /** Playlist only */
   itemCount?: number;
-}
-
-export interface ExploreChannel {
-  id: string;
-  name: string;
-  subtitle: string;
-  initials: string;
-  avatarGradient: string;
-}
-
-export interface TeamOrDept {
-  id: string;
-  name: string;
-  type: "department" | "team";
-  clipCount: number;
 }
 
 export type UploadStatus = "pending" | "uploading" | "success" | "error" | "cancelled";

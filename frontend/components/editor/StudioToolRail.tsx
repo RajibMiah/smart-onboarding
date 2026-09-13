@@ -22,17 +22,17 @@ const ARROW_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
  * active tool is a tab stop, Arrow Up/Down (and Home/End) move focus between
  * the currently visible buttons, matching the ARIA APG tabs pattern.
  */
-export function StudioToolRail({
+export const StudioToolRail = ({
   activeTool,
   isDrawerOpen,
   isRailExpanded,
   onSelectTool,
   onToggleExpanded,
-}: StudioToolRailProps) {
+}: StudioToolRailProps) => {
   const mediaTools = STUDIO_TOOLS.filter((tool) => tool.group === "media");
   const overlayTools = STUDIO_TOOLS.filter((tool) => tool.group === "overlay");
 
-  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (!ARROW_KEYS.has(event.key)) return;
     event.preventDefault();
 
@@ -47,7 +47,7 @@ export function StudioToolRail({
     else if (event.key === "End") nextIndex = buttons.length - 1;
 
     buttons[nextIndex]?.focus();
-  }
+  };
 
   return (
     <nav
@@ -96,9 +96,9 @@ export function StudioToolRail({
       </button>
     </nav>
   );
-}
+};
 
-function ToolButton({
+const ToolButton = ({
   tool,
   isSelected,
   isCurrent,
@@ -110,7 +110,7 @@ function ToolButton({
   /** The rail's roving-tabindex stop, independent of drawer open/closed. */
   isCurrent: boolean;
   onSelect: () => void;
-}) {
+}) => {
   const Icon = tool.icon;
   return (
     <button
@@ -133,4 +133,4 @@ function ToolButton({
       {tool.label}
     </button>
   );
-}
+};

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "AI Paper Clip — an AI-powered onboarding video tutorial and documentation platform.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+const RootLayout = ({ children }: LayoutProps<"/">) => {
   return (
     <html
       lang="en"
@@ -26,4 +26,5 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
-}
+};
+export default RootLayout;

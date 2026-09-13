@@ -2,7 +2,7 @@ import { LayoutDashboard } from "lucide-react";
 
 import { ComingSoon } from "@/components/dashboard/ComingSoon";
 
-export default function AnalyticsDashboardPage() {
+const AnalyticsDashboardPage = () => {
   return (
     <ComingSoon
       icon={LayoutDashboard}
@@ -10,4 +10,5 @@ export default function AnalyticsDashboardPage() {
       description="Viewership, completion rates, and engagement analytics will appear here."
     />
   );
-}
+};
+export default AnalyticsDashboardPage;

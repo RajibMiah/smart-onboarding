@@ -9,7 +9,9 @@ import {
   type SilenceStrategy,
   type VoiceoverMode,
 } from "@/hooks/useAutoEditWorkflow";
+import { useSharingOptions } from "@/hooks/useSharingOptions";
 import { cn } from "@/lib/utils";
+import type { SharingOptionsConfig } from "@/types/sharingOptions";
 
 interface AutoEditPanelProps {
   onNotify: (message: string) => void;
@@ -40,13 +42,50 @@ const SILENCE_STRATEGIES: { id: SilenceStrategy; title: string; description: str
 
 const SPEED_MULTIPLIERS = [2, 3, 4, 8];
 
+const VOICEOVER_SHORT_LABEL: Record<VoiceoverMode, string> = {
+  auto_generate: "Auto-generated",
+  ai_voice_clone: "AI voice",
+  keep_original: "Keep original",
+};
+
+type SharingChecklistKey = Extract<
+  keyof SharingOptionsConfig,
+  "createSubtitles" | "generateSOP" | "generateStepByStepGuide" | "generateChapters" | "autoGenerateKeywords" | "translateVideo"
+>;
+
+const SHARING_CHECKLIST: { key: SharingChecklistKey; title: string; description: string; disabled?: boolean }[] = [
+  { key: "createSubtitles", title: "Create subtitles", description: "Add subtitles to the output video" },
+  {
+    key: "generateSOP",
+    title: "Generate Standard Operating Procedure (SOP)",
+    description: "Creates a structured written guide from your video",
+    disabled: true,
+  },
+  {
+    key: "generateStepByStepGuide",
+    title: "Generate Step-by-Step Guide",
+    description: "Extract a written guide alongside the video",
+    disabled: true,
+  },
+  {
+    key: "generateChapters",
+    title: "Generate Chapters",
+    description: "Divide the video into logical chapters for easier navigation",
+    disabled: true,
+  },
+  { key: "autoGenerateKeywords", title: "Auto-generate Keywords", description: "Extract relevant keywords and tags from the video" },
+  { key: "translateVideo", title: "Translate Video", description: "Translate video to multiple languages" },
+];
+
+const BRANDING_OPTIONS = ["Default", "APC Branded", "No Branding"];
+
 /**
  * Auto-edit workflow form — fully interactive local config (voiceover mode,
  * silence handling, dictionary/publish toggles), wired through
  * `useAutoEditWorkflow`. "Apply Workflow" is a timed stub: there's no AI
  * backend yet, so it reports back via `onNotify` like the other panels.
  */
-export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
+export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
   const { videoClips } = useEditor();
   const {
     config,
@@ -57,14 +96,19 @@ export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
     setShortenSilences,
     setSilenceStrategy,
     setSilenceSpeedMultiplier,
-    setAutoPublish,
     applyWorkflow,
   } = useAutoEditWorkflow();
+  const { config: sharingConfig, setField: setSharingField } = useSharingOptions();
   const [customSpeedOpen, setCustomSpeedOpen] = useState(false);
 
   const hasMedia = videoClips.length > 0;
   const canApply = hasMedia && !isProcessing;
   const isCustomSpeed = !SPEED_MULTIPLIERS.includes(config.silenceSpeedMultiplier);
+
+  const sharingSummary = (() => {
+    const checked = SHARING_CHECKLIST.filter((item) => sharingConfig[item.key]).map((item) => item.title);
+    return checked.length > 0 ? checked.join(", ") : "Not configured";
+  })();
 
   return (
     <div className="flex h-full flex-col">
@@ -82,7 +126,13 @@ export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
         </div>
 
         <div className="flex flex-col gap-3 p-3">
-          <EditorialAccordion icon={Zap} title="Video Enhancement" description="Clean up and polish your recording" defaultOpen>
+          <EditorialAccordion
+            icon={Zap}
+            title="Video Enhancement"
+            description="Clean up and polish your recording"
+            summary={<Badge>{VOICEOVER_SHORT_LABEL[config.voiceoverMode]}</Badge>}
+            defaultOpen
+          >
             <div className="flex flex-col gap-4">
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Voiceover</p>
@@ -213,20 +263,72 @@ export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
             </div>
           </FlyoutCard>
 
-          <FlyoutCard
+          <EditorialAccordion
             icon={Sparkles}
             title="Sharing Options"
             description="Choose what gets generated from your video before sharing"
-            onClick={() => onNotify("Sharing options aren't available in this offline preview yet.")}
+            summary={<Badge>{sharingSummary}</Badge>}
           >
-            <Badge>Not configured</Badge>
-          </FlyoutCard>
+            <div className="flex flex-col gap-2.5">
+              {SHARING_CHECKLIST.map((item) => (
+                <label
+                  key={item.key}
+                  className={cn(
+                    "flex items-start gap-2.5 border p-2.5 text-left",
+                    item.disabled ? "cursor-not-allowed border-black/10" : "cursor-pointer border-black/20 hover:border-black",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sharingConfig[item.key]}
+                    disabled={item.disabled}
+                    onChange={(event) => setSharingField(item.key, event.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-black disabled:accent-neutral-300"
+                  />
+                  <span>
+                    <span className={cn("block text-sm font-medium", item.disabled ? "text-neutral-400" : "text-black")}>
+                      {item.title}
+                    </span>
+                    <span className={cn("block text-xs", item.disabled ? "text-neutral-400" : "text-neutral-500")}>
+                      {item.description}
+                    </span>
+                  </span>
+                </label>
+              ))}
+
+              <div className="pt-1">
+                <p className="text-sm font-medium text-black">Content branding</p>
+                <p className="mb-2 text-xs text-neutral-500">Apply branding to the generated content</p>
+                <div className="relative">
+                  <select
+                    value={sharingConfig.contentBranding}
+                    onChange={(event) => setSharingField("contentBranding", event.target.value)}
+                    className="w-full appearance-none border-2 border-black bg-white py-2 pl-3 pr-8 text-sm font-medium text-black"
+                  >
+                    {BRANDING_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black" />
+                </div>
+              </div>
+            </div>
+          </EditorialAccordion>
 
           <CheckboxCard
-            checked={config.autoPublish}
+            checked={sharingConfig.publishAPC}
             title="Publish APC Project"
-            description="Automatically make this project public upon workflow completion"
-            onChange={setAutoPublish}
+            description="Video will be auto published after workflow completion"
+            onChange={(checked) => setSharingField("publishAPC", checked)}
+          />
+
+          <CheckboxCard
+            checked={sharingConfig.navigateToReviewPage}
+            title="Navigate to Review Page"
+            description="Once the workflow is completed, you will be redirected to the review page"
+            onChange={(checked) => setSharingField("navigateToReviewPage", checked)}
           />
         </div>
       </div>
@@ -237,9 +339,9 @@ export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
           disabled={!canApply}
           onClick={() => applyWorkflow(onNotify)}
           className={cn(
-            "flex w-full items-center justify-center gap-2 border py-2.5 text-xs font-bold uppercase tracking-wider transition",
+            "flex w-full items-center justify-center gap-2 border py-3 text-xs font-bold uppercase tracking-wider transition",
             canApply
-              ? "border-black bg-brand-yellow text-black hover:bg-yellow-500"
+              ? "border-black bg-black text-white hover:bg-neutral-800"
               : "cursor-not-allowed border-black/20 bg-neutral-100 text-neutral-400",
           )}
         >
@@ -249,21 +351,24 @@ export function AutoEditPanel({ onNotify }: AutoEditPanelProps) {
       </div>
     </div>
   );
-}
+};
 
-function EditorialAccordion({
+const EditorialAccordion = ({
   icon: Icon,
   title,
   description,
+  summary,
   defaultOpen = false,
   children,
 }: {
   icon: ComponentType<{ className?: string }>;
   title: string;
   description: string;
+  /** Shown in place of the full content when collapsed — mirrors the flyout cards' badge row. */
+  summary?: ReactNode;
   defaultOpen?: boolean;
   children: ReactNode;
-}) {
+}) => {
   const [open, setOpen] = useState(defaultOpen);
   const contentId = useId();
 
@@ -282,8 +387,9 @@ function EditorialAccordion({
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-black">{title}</span>
           <span className="block text-xs text-neutral-500">{description}</span>
+          {!open && summary && <span className="mt-1.5 flex flex-wrap gap-1.5">{summary}</span>}
         </span>
-        <ChevronDown className={cn("h-4 w-4 shrink-0 text-black transition-transform", open && "rotate-180")} />
+        <ChevronRight className={cn("h-4 w-4 shrink-0 text-black transition-transform", open && "rotate-90")} />
       </button>
 
       <div
@@ -300,9 +406,9 @@ function EditorialAccordion({
       </div>
     </div>
   );
-}
+};
 
-function FlyoutCard({
+const FlyoutCard = ({
   icon: Icon,
   title,
   description,
@@ -314,7 +420,7 @@ function FlyoutCard({
   description: string;
   onClick: () => void;
   children: ReactNode;
-}) {
+}) => {
   return (
     <button type="button" onClick={onClick} className="flex flex-col gap-2.5 border-2 border-black p-3 text-left transition hover:bg-neutral-100">
       <div className="flex items-center gap-3">
@@ -330,9 +436,9 @@ function FlyoutCard({
       {children}
     </button>
   );
-}
+};
 
-function RadioCard({
+const RadioCard = ({
   selected,
   title,
   description,
@@ -344,7 +450,7 @@ function RadioCard({
   description: string;
   onSelect: () => void;
   compact?: boolean;
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -369,9 +475,9 @@ function RadioCard({
       </span>
     </button>
   );
-}
+};
 
-function CheckboxCard({
+const CheckboxCard = ({
   checked,
   title,
   description,
@@ -381,9 +487,14 @@ function CheckboxCard({
   title: string;
   description: string;
   onChange: (checked: boolean) => void;
-}) {
+}) => {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 border-2 border-black p-3 text-left">
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-2.5 border-2 p-3 text-left transition",
+        checked ? "border-black bg-brand-yellow/10" : "border-black/20 hover:border-black",
+      )}
+    >
       <input
         type="checkbox"
         checked={checked}
@@ -396,9 +507,9 @@ function CheckboxCard({
       </span>
     </label>
   );
-}
+};
 
-function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+const ToggleSwitch = ({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) => {
   return (
     <button
       type="button"
@@ -416,8 +527,8 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
       />
     </button>
   );
-}
+};
 
-function Badge({ children }: { children: ReactNode }) {
+const Badge = ({ children }: { children: ReactNode }) => {
   return <span className="border border-black bg-neutral-100 px-2 py-1 text-[11px] font-medium text-black">{children}</span>;
-}
+};

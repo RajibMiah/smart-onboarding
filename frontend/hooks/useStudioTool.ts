@@ -36,7 +36,7 @@ interface UseStudioToolResult {
  * React Strict Mode double-invokes updaters in dev to catch exactly this,
  * so that nested toggle fired twice and silently canceled itself out.
  */
-export function useStudioTool(initialTool: StudioTool = "media"): UseStudioToolResult {
+export const useStudioTool = (initialTool: StudioTool = "media"): UseStudioToolResult => {
   const [drawerState, setDrawerState] = useState<DrawerState>({ activeTool: initialTool, isDrawerOpen: true });
   const [isRailExpanded, setIsRailExpanded] = useState(true);
 
@@ -67,4 +67,4 @@ export function useStudioTool(initialTool: StudioTool = "media"): UseStudioToolR
     closeDrawer,
     toggleRailExpanded,
   };
-}
+};

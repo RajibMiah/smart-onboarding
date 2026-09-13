@@ -16,17 +16,27 @@ import {
   Undo2,
   Volume2,
   VolumeX,
+  ZoomIn,
 } from "lucide-react";
 
 import { useEditor } from "@/context/EditorContext";
 import { clipTimelineDuration, clipTimelineEnd, type TimelineClip } from "@/lib/editor/types";
 import { formatTimecode } from "@/lib/editor/media-utils";
+import { beginTimeRangeDrag } from "@/lib/editor/timeline-drag";
 import { cn } from "@/lib/utils";
+import type { ZoomRegion } from "@/types/zoom";
+
+import { BlurTimelineTrack } from "./timeline/BlurTimelineTrack";
+import { TextTimelineTrack } from "./timeline/TextTimelineTrack";
 
 const RULER_HEIGHT = 28;
 const VIDEO_LANE_HEIGHT = 64;
+const ZOOM_LANE_HEIGHT = 28;
+const BLUR_LANE_HEIGHT = 28;
+const TEXT_LANE_HEIGHT = 28;
 const AUDIO_LANE_HEIGHT = 52;
 const MIN_CLIP_SECONDS = 0.2;
+const MIN_ZOOM_SECONDS = 0.5;
 const MIN_VIEW_SECONDS = 30;
 const TRAILING_PADDING_SECONDS = 8;
 const SNAP_PIXEL_THRESHOLD = 8;
@@ -39,7 +49,7 @@ interface TimelineProps {
   isFullscreen: boolean;
 }
 
-export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: TimelineProps) {
+export const Timeline = ({ onNotify, onToggleFullscreen, isFullscreen }: TimelineProps) => {
   const {
     state,
     videoClips,
@@ -56,6 +66,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
     togglePlay,
     setZoom,
     toggleSnapping,
+    updateZoomRegion,
     undo,
     redo,
   } = useEditor();
@@ -67,7 +78,8 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
 
   const viewDurationSeconds = Math.max(totalDuration + TRAILING_PADDING_SECONDS, MIN_VIEW_SECONDS);
   const contentWidth = viewDurationSeconds * state.zoomLevel;
-  const contentHeight = RULER_HEIGHT + VIDEO_LANE_HEIGHT + AUDIO_LANE_HEIGHT;
+  const contentHeight =
+    RULER_HEIGHT + VIDEO_LANE_HEIGHT + ZOOM_LANE_HEIGHT + BLUR_LANE_HEIGHT + TEXT_LANE_HEIGHT + AUDIO_LANE_HEIGHT;
 
   const tickInterval = useMemo(() => pickTickInterval(state.zoomLevel), [state.zoomLevel]);
   const ticks = useMemo(() => {
@@ -78,28 +90,28 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
   const canCut =
     !!selectedClip && state.currentTime > selectedClip.startOffset && state.currentTime < clipTimelineEnd(selectedClip);
 
-  function scrubToClientX(clientX: number) {
+  const scrubToClientX = (clientX: number) => {
     const rect = contentRef.current?.getBoundingClientRect();
     if (!rect) return;
     const seconds = Math.min(viewDurationSeconds, Math.max(0, (clientX - rect.left) / state.zoomLevel));
     seek(seconds);
-  }
+  };
 
-  function handleScrubPointerDown(event: React.PointerEvent) {
+  const handleScrubPointerDown = (event: React.PointerEvent) => {
     event.preventDefault();
     scrubToClientX(event.clientX);
-    function onMove(ev: PointerEvent) {
+    const onMove = (ev: PointerEvent) => {
       scrubToClientX(ev.clientX);
-    }
-    function onUp() {
+    };
+    const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-    }
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-  }
+  };
 
-  function snapToTimeline(time: number, excludeClipId: string): number {
+  const snapToTimeline = (time: number, excludeClipId: string): number => {
     if (!state.snappingEnabled) return time;
     const thresholdSeconds = SNAP_PIXEL_THRESHOLD / state.zoomLevel;
     const candidates = [0, Math.round(time)];
@@ -117,9 +129,9 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
       }
     }
     return best;
-  }
+  };
 
-  function beginClipDrag(event: React.PointerEvent, clip: TimelineClip, mode: DragMode) {
+  const beginClipDrag = (event: React.PointerEvent, clip: TimelineClip, mode: DragMode) => {
     event.stopPropagation();
     event.preventDefault();
     selectClip(clip.id);
@@ -130,7 +142,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
     // so a single Undo reverts the whole gesture rather than one pixel of it.
     updateClip(clip.id, {}, { commit: true });
 
-    function onMove(ev: PointerEvent) {
+    const onMove = (ev: PointerEvent) => {
       const deltaSeconds = (ev.clientX - startClientX) / state.zoomLevel;
 
       if (mode === "move") {
@@ -155,16 +167,20 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
       let newTrimEnd = original.trimStart + (proposedEnd - original.startOffset);
       newTrimEnd = Math.max(Math.min(newTrimEnd, original.duration), original.trimStart + MIN_CLIP_SECONDS);
       updateClip(clip.id, { trimEnd: newTrimEnd });
-    }
+    };
 
-    function onUp() {
+    const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-    }
+    };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-  }
+  };
+
+  const beginZoomDrag = (event: React.PointerEvent, region: ZoomRegion, mode: DragMode) => {
+    beginTimeRangeDrag(event, region, mode, state.zoomLevel, MIN_ZOOM_SECONDS, (changes) => updateZoomRegion(region.id, changes));
+  };
 
   const playheadLeft = state.currentTime * state.zoomLevel;
 
@@ -236,6 +252,26 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
             ))}
           </div>
 
+          {/* Zoom lane */}
+          <div
+            onPointerDown={handleScrubPointerDown}
+            className="relative border-b border-black/15 bg-white"
+            style={{ height: ZOOM_LANE_HEIGHT }}
+          >
+            {state.zoomRegions.map((region) => (
+              <ZoomRegionBlock
+                key={region.id}
+                region={region}
+                zoomLevel={state.zoomLevel}
+                laneHeight={ZOOM_LANE_HEIGHT}
+                onDragStart={beginZoomDrag}
+              />
+            ))}
+          </div>
+
+          <BlurTimelineTrack laneHeight={BLUR_LANE_HEIGHT} onLaneScrub={handleScrubPointerDown} />
+          <TextTimelineTrack laneHeight={TEXT_LANE_HEIGHT} onLaneScrub={handleScrubPointerDown} />
+
           {/* Audio lane — mirrors every clip's own extracted waveform, since
               our recordings/uploads carry embedded audio rather than a
               separate audio-only track. */}
@@ -271,7 +307,7 @@ export function Timeline({ onNotify, onToggleFullscreen, isFullscreen }: Timelin
       </div>
     </div>
   );
-}
+};
 
 interface TimelineToolbarProps {
   canCut: boolean;
@@ -296,7 +332,7 @@ interface TimelineToolbarProps {
   isFullscreen: boolean;
 }
 
-function TimelineToolbar({
+const TimelineToolbar = ({
   canCut,
   onCut,
   onCleanup,
@@ -317,7 +353,7 @@ function TimelineToolbar({
   onSetZoom,
   onToggleFullscreen,
   isFullscreen,
-}: TimelineToolbarProps) {
+}: TimelineToolbarProps) => {
   return (
     <div className="flex items-center justify-between border-b-2 border-black px-3 py-2">
       <div className="flex items-center gap-1">
@@ -363,9 +399,9 @@ function TimelineToolbar({
       </div>
     </div>
   );
-}
+};
 
-function ToolbarIconButton({
+const ToolbarIconButton = ({
   icon: Icon,
   label,
   onClick,
@@ -377,7 +413,7 @@ function ToolbarIconButton({
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -394,7 +430,7 @@ function ToolbarIconButton({
       <Icon className="h-4 w-4" />
     </button>
   );
-}
+};
 
 interface VideoClipBlockProps {
   clip: TimelineClip;
@@ -405,7 +441,7 @@ interface VideoClipBlockProps {
   onDragStart: (event: React.PointerEvent, clip: TimelineClip, mode: DragMode) => void;
 }
 
-function VideoClipBlock({ clip, zoomLevel, laneHeight, selected, onSelect, onDragStart }: VideoClipBlockProps) {
+const VideoClipBlock = ({ clip, zoomLevel, laneHeight, selected, onSelect, onDragStart }: VideoClipBlockProps) => {
   const left = clip.startOffset * zoomLevel;
   const width = Math.max(4, clipTimelineDuration(clip) * zoomLevel);
 
@@ -445,9 +481,44 @@ function VideoClipBlock({ clip, zoomLevel, laneHeight, selected, onSelect, onDra
       />
     </div>
   );
-}
+};
 
-function AudioShadowBlock({
+const ZoomRegionBlock = ({
+  region,
+  zoomLevel,
+  laneHeight,
+  onDragStart,
+}: {
+  region: ZoomRegion;
+  zoomLevel: number;
+  laneHeight: number;
+  onDragStart: (event: React.PointerEvent, region: ZoomRegion, mode: DragMode) => void;
+}) => {
+  const left = region.startTime * zoomLevel;
+  const width = Math.max(4, (region.endTime - region.startTime) * zoomLevel);
+
+  return (
+    <div
+      onPointerDown={(event) => onDragStart(event, region, "move")}
+      className="absolute top-1 flex cursor-grab items-center gap-1 overflow-hidden border-2 border-black bg-brand-yellow px-1.5 active:cursor-grabbing"
+      style={{ left, width, height: laneHeight - 8 }}
+    >
+      <ZoomIn className="h-3 w-3 shrink-0 text-black" />
+      <span className="truncate text-[10px] font-bold text-black">{region.scale.toFixed(1)}x Zoom</span>
+
+      <div
+        onPointerDown={(event) => onDragStart(event, region, "trim-start")}
+        className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/0 hover:bg-black/20"
+      />
+      <div
+        onPointerDown={(event) => onDragStart(event, region, "trim-end")}
+        className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-black/0 hover:bg-black/20"
+      />
+    </div>
+  );
+};
+
+const AudioShadowBlock = ({
   clip,
   zoomLevel,
   laneHeight,
@@ -457,7 +528,7 @@ function AudioShadowBlock({
   zoomLevel: number;
   laneHeight: number;
   onToggleMute: () => void;
-}) {
+}) => {
   const left = clip.startOffset * zoomLevel;
   const width = Math.max(4, clipTimelineDuration(clip) * zoomLevel);
   const blockHeight = laneHeight - 10;
@@ -479,9 +550,9 @@ function AudioShadowBlock({
       </button>
     </div>
   );
-}
+};
 
-function WaveformCanvas({
+const WaveformCanvas = ({
   peaks,
   widthPx,
   heightPx,
@@ -491,7 +562,7 @@ function WaveformCanvas({
   widthPx: number;
   heightPx: number;
   color: string;
-}) {
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -519,14 +590,14 @@ function WaveformCanvas({
   }, [peaks, widthPx, heightPx, color]);
 
   return <canvas ref={canvasRef} style={{ width: widthPx, height: heightPx }} className="block" />;
-}
+};
 
-function pickTickInterval(zoomLevel: number): number {
+const pickTickInterval = (zoomLevel: number): number => {
   const candidates = [1, 2, 5, 10, 15, 30, 60];
   return candidates.find((seconds) => seconds * zoomLevel >= 50) ?? 60;
-}
+};
 
-function HiResToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+const HiResToggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => {
   return (
     <label className="flex items-center gap-2">
       <span>Switch to Hi-res</span>
@@ -550,4 +621,4 @@ function HiResToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => 
       </button>
     </label>
   );
-}
+};

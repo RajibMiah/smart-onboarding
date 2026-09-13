@@ -13,7 +13,7 @@ export interface ProfileFormValues {
 
 interface UseProfileFormOptions {
   initialValues: ProfileFormValues;
-  onSave?: (values: ProfileFormValues) => void;
+  onSave?: (values: ProfileFormValues) => Promise<void> | void;
 }
 
 interface UseProfileFormResult {
@@ -21,6 +21,7 @@ interface UseProfileFormResult {
   setField: <K extends keyof ProfileFormValues>(key: K, value: ProfileFormValues[K]) => void;
   isDirty: boolean;
   isSaving: boolean;
+  saveError: string | null;
   save: () => void;
   discard: () => void;
 }
@@ -31,10 +32,11 @@ interface UseProfileFormResult {
  * "Save changes" bar would never go away after a successful save, since the
  * prop itself never changes.
  */
-export function useProfileForm({ initialValues, onSave }: UseProfileFormOptions): UseProfileFormResult {
+export const useProfileForm = ({ initialValues, onSave }: UseProfileFormOptions): UseProfileFormResult => {
   const [values, setValues] = useState(initialValues);
   const [savedValues, setSavedValues] = useState(initialValues);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const isDirty = useMemo(
     () => (Object.keys(savedValues) as (keyof ProfileFormValues)[]).some((key) => values[key] !== savedValues[key]),
@@ -52,13 +54,14 @@ export function useProfileForm({ initialValues, onSave }: UseProfileFormOptions)
 
   const save = useCallback(() => {
     setIsSaving(true);
-    // No backend yet — simulate a brief save, then commit the new baseline.
-    setTimeout(() => {
-      setSavedValues(values);
-      onSave?.(values);
-      setIsSaving(false);
-    }, 400);
+    setSaveError(null);
+    Promise.resolve(onSave?.(values))
+      .then(() => setSavedValues(values))
+      .catch((error: unknown) => {
+        setSaveError(error instanceof Error ? error.message : "Couldn't save your changes — try again.");
+      })
+      .finally(() => setIsSaving(false));
   }, [values, onSave]);
 
-  return { values, setField, isDirty, isSaving, save, discard };
-}
+  return { values, setField, isDirty, isSaving, saveError, save, discard };
+};

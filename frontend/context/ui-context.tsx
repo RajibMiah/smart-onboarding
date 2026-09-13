@@ -4,15 +4,26 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 
+import { authApi, type ApiUser } from "@/lib/api-client";
 import type { AppUser } from "@/lib/types";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "apc.sidebar-collapsed";
+
+const EMPTY_USER: AppUser = { name: "", email: "", initials: "" };
+
+const toAppUser = (apiUser: ApiUser): AppUser => {
+  const name = apiUser.full_name || apiUser.email;
+  const initials = (apiUser.first_name[0] ?? apiUser.email[0] ?? "?").toUpperCase();
+  return { name, email: apiUser.email, initials };
+};
 
 interface UIContextValue {
   /** Desktop sidebar collapsed/expanded — persisted across reloads. */
@@ -30,6 +41,12 @@ interface UIContextValue {
   closeModal: () => void;
 
   user: AppUser;
+  apiUser: ApiUser | null;
+  isLoadingUser: boolean;
+  /** Merges freshly-saved fields (e.g. after an account settings save) without a round-trip. */
+  updateApiUser: (apiUser: ApiUser) => void;
+  logout: () => Promise<void>;
+
   /** Uploaded profile picture (object URL) — shared so the navbar and the
    *  account page's avatar stay in sync; null falls back to initials. */
   avatarUrl: string | null;
@@ -37,12 +54,6 @@ interface UIContextValue {
 }
 
 const UIContext = createContext<UIContextValue | null>(null);
-
-const MOCK_USER: AppUser = {
-  name: "Rajib",
-  email: "rajib.miah.new@gmail.com",
-  initials: "R",
-};
 
 /**
  * Tiny external store for the persisted sidebar flag. Reading/writing
@@ -54,29 +65,29 @@ const MOCK_USER: AppUser = {
 const sidebarStoreListeners = new Set<() => void>();
 let cachedSidebarCollapsed: boolean | null = null;
 
-function readSidebarCollapsed(): boolean {
+const readSidebarCollapsed = (): boolean => {
   try {
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
   } catch {
     return false;
   }
-}
+};
 
-function getSidebarSnapshot(): boolean {
+const getSidebarSnapshot = (): boolean => {
   cachedSidebarCollapsed ??= readSidebarCollapsed();
   return cachedSidebarCollapsed;
-}
+};
 
-function getSidebarServerSnapshot(): boolean {
+const getSidebarServerSnapshot = (): boolean => {
   return false;
-}
+};
 
-function subscribeToSidebar(listener: () => void): () => void {
+const subscribeToSidebar = (listener: () => void): () => void => {
   sidebarStoreListeners.add(listener);
   return () => sidebarStoreListeners.delete(listener);
-}
+};
 
-function setSidebarCollapsedStore(value: boolean): void {
+const setSidebarCollapsedStore = (value: boolean): void => {
   cachedSidebarCollapsed = value;
   try {
     window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(value));
@@ -84,9 +95,10 @@ function setSidebarCollapsedStore(value: boolean): void {
     // Non-fatal: state still updates for this session even if it can't persist.
   }
   sidebarStoreListeners.forEach((listener) => listener());
-}
+};
 
-export function UIProvider({ children }: { children: ReactNode }) {
+export const UIProvider = ({ children }: { children: ReactNode }) => {
+  const router = useRouter();
   const sidebarCollapsed = useSyncExternalStore(
     subscribeToSidebar,
     getSidebarSnapshot,
@@ -95,6 +107,28 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [apiUser, setApiUser] = useState<ApiUser | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    authApi
+      .me()
+      .then((fetched) => {
+        if (cancelled) return;
+        setApiUser(fetched);
+        if (fetched.avatar_url) setAvatarUrl(fetched.avatar_url);
+        setIsLoadingUser(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setIsLoadingUser(false);
+        router.replace("/login");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const toggleSidebarCollapsed = useCallback(() => {
     setSidebarCollapsedStore(!getSidebarSnapshot());
@@ -106,6 +140,16 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const openModal = useCallback((id: string) => setActiveModal(id), []);
   const closeModal = useCallback(() => setActiveModal(null), []);
 
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // Cookies are cleared server-side either way; proceed to redirect regardless.
+    }
+    setApiUser(null);
+    router.replace("/login");
+  }, [router]);
+
   const value = useMemo<UIContextValue>(
     () => ({
       sidebarCollapsed,
@@ -116,7 +160,11 @@ export function UIProvider({ children }: { children: ReactNode }) {
       activeModal,
       openModal,
       closeModal,
-      user: MOCK_USER,
+      user: apiUser ? toAppUser(apiUser) : EMPTY_USER,
+      apiUser,
+      isLoadingUser,
+      updateApiUser: setApiUser,
+      logout,
       avatarUrl,
       setAvatarUrl,
     }),
@@ -129,15 +177,18 @@ export function UIProvider({ children }: { children: ReactNode }) {
       activeModal,
       openModal,
       closeModal,
+      apiUser,
+      isLoadingUser,
+      logout,
       avatarUrl,
     ],
   );
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
-}
+};
 
-export function useUI(): UIContextValue {
+export const useUI = (): UIContextValue => {
   const ctx = useContext(UIContext);
   if (!ctx) throw new Error("useUI must be used within a <UIProvider>");
   return ctx;
-}
+};

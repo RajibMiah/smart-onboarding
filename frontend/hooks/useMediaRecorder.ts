@@ -28,7 +28,7 @@ interface UseMediaRecorderResult {
 }
 
 /** First mime type the browser's `MediaRecorder` actually supports. */
-function pickSupportedMimeType(): string {
+const pickSupportedMimeType = (): string => {
   const candidates = [
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
@@ -36,14 +36,14 @@ function pickSupportedMimeType(): string {
     "video/webm",
   ];
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "video/webm";
-}
+};
 
 /**
  * Screen and webcam recording via `getDisplayMedia` / `getUserMedia` +
  * `MediaRecorder`, buffered entirely in memory and handed back as a
  * ready-to-play `Blob`/object URL — no upload, no server involved.
  */
-export function useMediaRecorder({ onComplete }: UseMediaRecorderOptions): UseMediaRecorderResult {
+export const useMediaRecorder = ({ onComplete }: UseMediaRecorderOptions): UseMediaRecorderResult => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSource, setRecordingSource] = useState<RecordingSource | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -148,4 +148,4 @@ export function useMediaRecorder({ onComplete }: UseMediaRecorderOptions): UseMe
     startCameraRecording,
     stopRecording,
   };
-}
+};

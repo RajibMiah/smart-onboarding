@@ -2,7 +2,7 @@ import { Inbox } from "lucide-react";
 
 import { ComingSoon } from "@/components/dashboard/ComingSoon";
 
-export default function RequestsPage() {
+const RequestsPage = () => {
   return (
     <ComingSoon
       icon={Inbox}
@@ -10,4 +10,5 @@ export default function RequestsPage() {
       description="Ask teammates to record a video, and track open requests here."
     />
   );
-}
+};
+export default RequestsPage;

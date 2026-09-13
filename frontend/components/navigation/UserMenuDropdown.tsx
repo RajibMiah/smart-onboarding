@@ -32,7 +32,7 @@ const STUB_ITEMS: StubMenuItem[] = [
 ];
 
 /** Avatar flyout in the top bar — account link, stubbed support links, logout. */
-export function UserMenuDropdown({ user, avatarUrl, onStubAction }: UserMenuDropdownProps) {
+export const UserMenuDropdown = ({ user, avatarUrl, onStubAction }: UserMenuDropdownProps) => {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,9 +41,9 @@ export function UserMenuDropdown({ user, avatarUrl, onStubAction }: UserMenuDrop
 
   useEffect(() => {
     if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
@@ -123,4 +123,4 @@ export function UserMenuDropdown({ user, avatarUrl, onStubAction }: UserMenuDrop
       )}
     </div>
   );
-}
+};

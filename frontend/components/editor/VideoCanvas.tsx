@@ -1,16 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Camera, FolderOpen, Plus, ScanLine, Upload, UploadCloud } from "lucide-react";
 
 import { useEditor } from "@/context/EditorContext";
 import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
 import type { CanvasAspectRatio } from "@/lib/editor/types";
 
+import { BlurOverlay } from "./canvas/BlurOverlay";
+import { ImageOverlay } from "./canvas/ImageOverlay";
+import { TextOverlay } from "./canvas/TextOverlay";
+
 const ASPECT_RATIO_CSS: Record<CanvasAspectRatio, string> = {
   "16:9": "16 / 9",
   "9:16": "9 / 16",
   "1:1": "1 / 1",
+};
+
+/** Below this drag distance (in px), a marquee attempt is treated as a stray click, not a region. */
+const MIN_ZOOM_DRAG_PX = 12;
+
+interface DragBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const clamp = (value: number, min: number, max: number): number => {
+  return Math.min(Math.max(value, min), max);
 };
 
 interface VideoCanvasProps {
@@ -21,21 +39,79 @@ interface VideoCanvasProps {
   onTurnSlides: () => void;
 }
 
-export function VideoCanvas({
+export const VideoCanvas = ({
   onStartScreenRecording,
   onStartCameraRecording,
   onTriggerUpload,
   onOpenLibrary,
   onTurnSlides,
-}: VideoCanvasProps) {
-  const { videoClips, state } = useEditor();
+}: VideoCanvasProps) => {
+  const { videoClips, state, activeZoomRegion, addZoomRegion, cancelZoomDrawing } = useEditor();
   const { videoRef, activeClip } = useTimelinePlayback();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const canvasBoxRef = useRef<HTMLDivElement>(null);
+  const dragOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const [dragBox, setDragBox] = useState<DragBox | null>(null);
 
   const hasMedia = videoClips.length > 0;
 
+  // Transform-origin (not translate) is what actually places the zoom: scaling
+  // around the region's own center reaches the same visual result as a
+  // scale+translate pair, without the extra offset math — and as the scale
+  // eases back to 1 on exit, the origin's position stops mattering, so the
+  // exit reads as smooth even though the origin snaps back immediately.
+  const videoTransform = activeZoomRegion ? `scale(${activeZoomRegion.scale})` : "scale(1)";
+  const videoTransformOrigin = activeZoomRegion
+    ? `${(activeZoomRegion.bounds.x + activeZoomRegion.bounds.width / 2) * 100}% ${(activeZoomRegion.bounds.y + activeZoomRegion.bounds.height / 2) * 100}%`
+    : "50% 50%";
+
+  const handleMarqueePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = canvasBoxRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const origin = { x: clamp(event.clientX - rect.left, 0, rect.width), y: clamp(event.clientY - rect.top, 0, rect.height) };
+    dragOriginRef.current = origin;
+    setDragBox({ left: origin.x, top: origin.y, width: 0, height: 0 });
+  };
+
+  const handleMarqueePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const origin = dragOriginRef.current;
+    const rect = canvasBoxRef.current?.getBoundingClientRect();
+    if (!origin || !rect) return;
+    const currentX = clamp(event.clientX - rect.left, 0, rect.width);
+    const currentY = clamp(event.clientY - rect.top, 0, rect.height);
+    setDragBox({
+      left: Math.min(origin.x, currentX),
+      top: Math.min(origin.y, currentY),
+      width: Math.abs(currentX - origin.x),
+      height: Math.abs(currentY - origin.y),
+    });
+  };
+
+  const handleMarqueePointerUp = () => {
+    const rect = canvasBoxRef.current?.getBoundingClientRect();
+    if (rect && dragBox && dragBox.width > MIN_ZOOM_DRAG_PX && dragBox.height > MIN_ZOOM_DRAG_PX) {
+      addZoomRegion({
+        x: dragBox.left / rect.width,
+        y: dragBox.top / rect.height,
+        width: dragBox.width / rect.width,
+        height: dragBox.height / rect.height,
+      });
+    } else {
+      cancelZoomDrawing();
+    }
+    dragOriginRef.current = null;
+    setDragBox(null);
+  };
+
   return (
-    <section className="relative flex min-w-0 flex-1 items-center justify-center bg-neutral-900 p-6">
+    <section className="relative flex min-w-0 flex-1 items-center justify-center bg-neutral-900 px-[15px] py-6">
+      {state.isDrawingZoom && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 border-2 border-black bg-brand-yellow px-3 py-1.5 text-xs font-semibold text-black shadow-popover">
+          Draw a rectangle to set the zoom area
+        </div>
+      )}
+
       {/* The <video> element is mounted persistently (not conditionally) so
           useTimelinePlayback's ref never goes stale between clip switches.
           The wrapping box reshapes to the Settings panel's aspect-ratio
@@ -43,15 +119,45 @@ export function VideoCanvas({
           state below can sit in the same stacking context without a jump
           when media first loads. */}
       <div
-        className="relative flex h-full max-h-full w-auto max-w-full items-center justify-center"
+        ref={canvasBoxRef}
+        className="relative flex h-full max-h-full w-auto max-w-full items-center justify-center overflow-hidden"
         style={{ aspectRatio: ASPECT_RATIO_CSS[state.canvasAspectRatio] }}
       >
         <video
           ref={videoRef}
           className="h-full w-full bg-black object-contain shadow-popover"
-          style={{ visibility: hasMedia ? "visible" : "hidden" }}
+          style={{
+            visibility: hasMedia ? "visible" : "hidden",
+            transform: videoTransform,
+            transformOrigin: videoTransformOrigin,
+            transition: "transform 300ms ease",
+          }}
           playsInline
         />
+
+        {state.isDrawingZoom && (
+          <div
+            onPointerDown={handleMarqueePointerDown}
+            onPointerMove={handleMarqueePointerMove}
+            onPointerUp={handleMarqueePointerUp}
+            className="absolute inset-0 z-20 cursor-crosshair"
+          >
+            {dragBox && (
+              <div
+                className="pointer-events-none absolute border-2 border-brand-yellow bg-brand-yellow/20"
+                style={{ left: dragBox.left, top: dragBox.top, width: dragBox.width, height: dragBox.height }}
+              />
+            )}
+          </div>
+        )}
+
+        {hasMedia && (
+          <>
+            <BlurOverlay containerRef={canvasBoxRef} />
+            <TextOverlay containerRef={canvasBoxRef} />
+            <ImageOverlay containerRef={canvasBoxRef} />
+          </>
+        )}
       </div>
 
       {hasMedia && !activeClip && (
@@ -101,9 +207,9 @@ export function VideoCanvas({
       )}
     </section>
   );
-}
+};
 
-function ActionPill({ icon: Icon, label, onClick }: { icon: typeof Camera; label: string; onClick: () => void }) {
+const ActionPill = ({ icon: Icon, label, onClick }: { icon: typeof Camera; label: string; onClick: () => void }) => {
   return (
     <button
       type="button"
@@ -114,13 +220,13 @@ function ActionPill({ icon: Icon, label, onClick }: { icon: typeof Camera; label
       {label}
     </button>
   );
-}
+};
 
-function ShortcutRow({ keys, action }: { keys: string; action: string }) {
+const ShortcutRow = ({ keys, action }: { keys: string; action: string }) => {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
       <span className="text-neutral-400">{action}</span>
       <kbd className="border border-white/30 bg-black px-1.5 py-0.5 font-mono text-[10px] text-white">{keys}</kbd>
     </div>
   );
-}
+};

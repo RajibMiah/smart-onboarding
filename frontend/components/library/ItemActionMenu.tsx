@@ -1,21 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Copy, FolderInput, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
+import { MoreHorizontal } from "lucide-react";
 
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { cn } from "@/lib/utils";
 
-interface ItemActionMenuProps {
-  itemLabel: string;
-  onRename?: () => void;
-  onMoveToProject?: () => void;
-  onDuplicate?: () => void;
-  onDelete?: () => void;
+export interface ActionMenuItem {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  onClick?: () => void;
+  tone?: "default" | "danger";
+  /** Renders a divider directly above this item — used to set off a destructive action. */
+  dividerBefore?: boolean;
 }
 
-/** "···" row-actions dropdown — outside-click and Escape both close it. */
-export function ItemActionMenu({ itemLabel, onRename, onMoveToProject, onDuplicate, onDelete }: ItemActionMenuProps) {
+interface ItemActionMenuProps {
+  itemLabel: string;
+  items: ActionMenuItem[];
+}
+
+/** "···" row-actions dropdown — outside-click and Escape both close it. Item set is caller-defined (clips/pages/playlists each need a different list). */
+export const ItemActionMenu = ({ itemLabel, items }: ItemActionMenuProps) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -23,19 +29,19 @@ export function ItemActionMenu({ itemLabel, onRename, onMoveToProject, onDuplica
 
   useEffect(() => {
     if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  function runAndClose(action?: () => void) {
+  const runAndClose = (action?: () => void) => {
     return () => {
       setOpen(false);
       action?.();
     };
-  }
+  };
 
   return (
     <div ref={containerRef} className="relative">
@@ -57,30 +63,31 @@ export function ItemActionMenu({ itemLabel, onRename, onMoveToProject, onDuplica
         <div
           role="menu"
           aria-label={`${itemLabel} actions`}
-          className="absolute right-0 top-full z-20 mt-1 w-44 border-2 border-black bg-white py-1 shadow-popover animate-modal-in"
+          className="absolute right-0 top-full z-20 mt-1 w-48 border-2 border-black bg-white py-1 shadow-popover animate-modal-in"
         >
-          <MenuItem icon={Pencil} label="Rename" onClick={runAndClose(onRename)} />
-          <MenuItem icon={FolderInput} label="Move to Project" onClick={runAndClose(onMoveToProject)} />
-          <MenuItem icon={Copy} label="Duplicate" onClick={runAndClose(onDuplicate)} />
-          <div className="my-1 h-px bg-black/15" />
-          <MenuItem icon={Trash2} label="Delete" tone="danger" onClick={runAndClose(onDelete)} />
+          {items.map((item) => (
+            <div key={item.label}>
+              {item.dividerBefore && <div className="my-1 h-px bg-black/15" />}
+              <MenuItem icon={item.icon} label={item.label} tone={item.tone} onClick={runAndClose(item.onClick)} />
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
-}
+};
 
-function MenuItem({
+const MenuItem = ({
   icon: Icon,
   label,
   onClick,
   tone = "default",
 }: {
-  icon: typeof Pencil;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
   tone?: "default" | "danger";
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -95,4 +102,4 @@ function MenuItem({
       {label}
     </button>
   );
-}
+};
