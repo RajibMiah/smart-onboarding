@@ -8,6 +8,17 @@ from django.db import models
 from core.models import Organization, TimeStampedModel
 
 
+def default_filter_settings() -> dict:
+    """Neutral (no-op) non-destructive filter values — matches the Studio's own defaults."""
+    return {
+        "brightness": 100,
+        "contrast": 100,
+        "saturation": 100,
+        "volumeGain": 1.0,
+        "noiseSuppression": False,
+    }
+
+
 class ClipQuerySet(models.QuerySet):
     def for_user(self, user):
         return self.filter(organization_id=user.organization_id)
@@ -45,6 +56,11 @@ class Clip(TimeStampedModel):
     thumbnail_url = models.URLField(blank=True, help_text="External thumbnail URL, used when no file is uploaded.")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     visibility = models.CharField(max_length=20, choices=Visibility.choices, default=Visibility.DRAFT)
+    # Non-destructive studio adjustments applied live on playback (CSS filter
+    # for brightness/contrast/saturation; volumeGain/noiseSuppression are
+    # metadata today, no live audio DSP yet) — camelCase keys so the frontend
+    # round-trips this dict with zero translation.
+    filter_settings = models.JSONField(default=default_filter_settings, blank=True)
 
     objects = ClipQuerySet.as_manager()
 

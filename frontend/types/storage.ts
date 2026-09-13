@@ -2,10 +2,15 @@
 
 import type { CanvasAspectRatio, TimelineClip } from "@/lib/editor/types";
 import type { BlurRegion, ImageOverlay, TextRegion } from "@/types/overlays";
+import type { TimelineCut, VideoFilterSettings } from "@/types/project";
 import type { ZoomRegion } from "@/types/zoom";
 
 export const STUDIO_DB_NAME = "apc_studio_db";
-export const STUDIO_DB_VERSION = 1;
+// v2 adds `cuts`/`filters` to `ProjectTimelineState` — a payload-shape change
+// only (no new object store or index), but bumped to mark the schema change
+// for anyone inspecting the DB, and it's a harmless no-op upgrade for the
+// three existing stores either way.
+export const STUDIO_DB_VERSION = 2;
 
 export const STORE_MEDIA_BLOBS = "media_blobs";
 export const STORE_PROJECT_DRAFTS = "project_drafts";
@@ -24,7 +29,7 @@ export interface MediaBlobRecord {
   createdAt: string;
 }
 
-export type DraftStatus = "draft" | "processing" | "ready" | "published";
+export type DraftStatus = "draft" | "processing" | "ready" | "published" | "saved";
 
 /**
  * A `TimelineClip` as stored on disk. `mediaId` replaces the live, session-only
@@ -43,6 +48,8 @@ export interface ProjectTimelineState {
   blurRegions: BlurRegion[];
   textRegions: TextRegion[];
   imageOverlays: ImageOverlayDraft[];
+  cuts: TimelineCut[];
+  filters: VideoFilterSettings;
 }
 
 /** Store 2: one multi-track project draft, auto-saved as the editor changes. */

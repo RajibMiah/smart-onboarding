@@ -21,6 +21,7 @@ import { StudioUploadModal } from "./modals/StudioUploadModal";
 import { AudioPanel } from "./panels/AudioPanel";
 import { AutoEditPanel } from "./panels/AutoEditPanel";
 import { BlurPanel } from "./panels/BlurPanel";
+import { CutsPanel } from "./panels/CutsPanel";
 import { ElementsPanel } from "./panels/ElementsPanel";
 import { MediaPanel } from "./panels/MediaPanel";
 import { SettingsPanel } from "./panels/SettingsPanel";
@@ -148,6 +149,8 @@ const EditorLayoutInner = () => {
         );
       case "audio":
         return <AudioPanel onNotify={toast.show} />;
+      case "cuts":
+        return <CutsPanel onNotify={toast.show} />;
       case "blur":
         return <BlurPanel onNotify={toast.show} />;
       case "text":
