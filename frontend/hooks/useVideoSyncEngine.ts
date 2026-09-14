@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
+import { computeZoomTransform } from "@/lib/editor/zoom-transform";
 import type { ProjectMetadataPayload } from "@/types/project";
 import type { ZoomRegion } from "@/types/zoom";
 
@@ -98,13 +99,7 @@ export function useVideoSyncEngine(
     return () => cancelAnimationFrame(frameRef.current);
   }, [videoRef]);
 
-  // scale() then translate(): percentages in `translate()` resolve against the
-  // element's own (unscaled) box, so this re-centers the region's midpoint on
-  // the viewport *before* the scale blows it up — the same result as
-  // transform-origin, expressed as scale+translate per the required contract.
-  const zoomTransform = activeZoomRegion
-    ? `scale(${activeZoomRegion.scale}) translate(${(0.5 - (activeZoomRegion.bounds.x + activeZoomRegion.bounds.width / 2)) * 100}%, ${(0.5 - (activeZoomRegion.bounds.y + activeZoomRegion.bounds.height / 2)) * 100}%)`
-    : "scale(1) translate(0%, 0%)";
+  const zoomTransform = computeZoomTransform(activeZoomRegion);
 
   const seekTo = useCallback(
     (timestamp: number) => {

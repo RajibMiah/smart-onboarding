@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowRight, Cloud, Trash2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AlertTriangle, ArrowRight, Cloud, Loader2, Trash2 } from "lucide-react";
 
 import { Toast } from "@/components/ui/Toast";
 import { useEditor } from "@/context/EditorContext";
 import { useMediaIngestion } from "@/hooks/useMediaIngestion";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
+import { useStudioPersistence } from "@/hooks/useStudioPersistence";
 import { useStudioTool } from "@/hooks/useStudioTool";
 import { useToast } from "@/hooks/useToast";
+import { clearLocalProjectId, defaultProjectTitle, getOrCreateLocalProjectId } from "@/lib/editor/project-defaults";
+import type { SaveStatus } from "@/types/storage";
 import type { StudioTool } from "@/types/studio";
 
 import { StudioDrawer } from "./StudioDrawer";
@@ -60,11 +63,30 @@ const EditorLayoutInner = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const studioRef = useRef<HTMLDivElement>(null);
 
+  // A `?clip=` session resumes an existing backend clip — app/studio/page.tsx
+  // already hydrates and mirrors that one to/from IndexedDB itself, keyed by
+  // the real clip id, so persistence here is scoped to the other case: a
+  // brand-new recording that has no backend id yet and, until Review's
+  // "Done", would otherwise live only as an in-memory blob URL — gone for
+  // good on a crash or an accidental reload.
+  const isFreshRecordingSession = !useSearchParams().get("clip");
+  const localProjectId = useMemo(() => getOrCreateLocalProjectId(), []);
+  const [projectTitle] = useState(defaultProjectTitle);
+  const persistence = useStudioPersistence({
+    projectId: localProjectId,
+    title: projectTitle,
+    enabled: isFreshRecordingSession,
+  });
+
   const handleRecordingComplete = useCallback(
     (result: { url: string; durationSeconds: number; name: string }) => {
       ingest({ src: result.url, name: result.name, duration: result.durationSeconds, type: "video" });
+      // The whole point is that a freshly recorded clip is durable the
+      // instant recording stops — waiting for the debounced autosave would
+      // leave a multi-second window where a crash still loses it.
+      void persistence.saveNow();
     },
-    [ingest],
+    [ingest, persistence],
   );
 
   const recorder = useMediaRecorder({ onComplete: handleRecordingComplete });
@@ -72,6 +94,10 @@ const EditorLayoutInner = () => {
   useEffect(() => {
     if (recorder.error) toast.show(recorder.error);
   }, [recorder.error, toast]);
+
+  useEffect(() => {
+    if (persistence.errorMessage) toast.show(persistence.errorMessage);
+  }, [persistence.errorMessage, toast]);
 
   const openMediaPanel = useCallback(() => studioTool.openTool("media"), [studioTool]);
 
@@ -129,8 +155,12 @@ const EditorLayoutInner = () => {
     if (videoClips.length === 0) return;
     if (window.confirm("Delete this APC project? This clears every clip and cannot be undone.")) {
       resetProject();
+      if (isFreshRecordingSession) {
+        void persistence.discardDraft();
+        clearLocalProjectId();
+      }
     }
-  }, [videoClips.length, resetProject]);
+  }, [videoClips.length, resetProject, isFreshRecordingSession, persistence]);
 
   const renderActivePanel = (tool: StudioTool): ReactNode => {
     switch (tool) {
@@ -166,9 +196,25 @@ const EditorLayoutInner = () => {
     }
   };
 
+  // Only a fresh-recording session restores anything here — gating first
+  // paint on a `?clip=` session's own (separate) network/IndexedDB load
+  // is app/studio/page.tsx's job, not this hook's.
+  if (isFreshRecordingSession && persistence.isRestoring) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-white">
+        <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+        <p className="text-sm text-neutral-500">Restoring your last session…</p>
+      </div>
+    );
+  }
+
   return (
     <div ref={studioRef} className="flex h-screen flex-col bg-white">
-      <EditorHeader onDeleteProject={handleDeleteProject} onNext={() => router.push("/studio/review")} />
+      <EditorHeader
+        onDeleteProject={handleDeleteProject}
+        onNext={() => router.push("/studio/review")}
+        saveStatus={isFreshRecordingSession ? persistence.saveStatus : "idle"}
+      />
 
       <div className="flex min-h-0 flex-1">
         <StudioToolRail
@@ -200,7 +246,15 @@ const EditorLayoutInner = () => {
   );
 };
 
-const EditorHeader = ({ onDeleteProject, onNext }: { onDeleteProject: () => void; onNext: () => void }) => {
+const EditorHeader = ({
+  onDeleteProject,
+  onNext,
+  saveStatus,
+}: {
+  onDeleteProject: () => void;
+  onNext: () => void;
+  saveStatus: SaveStatus;
+}) => {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b-2 border-black px-4">
       <Link href="/" className="flex items-center gap-2">
@@ -211,9 +265,7 @@ const EditorHeader = ({ onDeleteProject, onNext }: { onDeleteProject: () => void
       </Link>
 
       <div className="flex items-center gap-2">
-        <span className="flex items-center gap-1.5 text-xs text-neutral-500">
-          <Cloud className="h-3.5 w-3.5" /> Saved
-        </span>
+        <SaveStatusIndicator status={saveStatus} />
         <button
           type="button"
           onClick={onDeleteProject}
@@ -230,5 +282,32 @@ const EditorHeader = ({ onDeleteProject, onNext }: { onDeleteProject: () => void
         </button>
       </div>
     </header>
+  );
+};
+
+/** Reflects `useStudioPersistence`'s real local-save state — replacing what
+ *  used to be a hardcoded "Saved" label regardless of whether anything had
+ *  actually been saved. "idle" (a `?clip=` session, which persists through
+ *  its own separate flow instead) reads the same as "saved" here rather than
+ *  showing a state that would just raise unanswerable questions. */
+const SaveStatusIndicator = ({ status }: { status: SaveStatus }) => {
+  if (status === "saving") {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-neutral-500">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+      </span>
+    );
+  }
+  if (status === "error") {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-red-600">
+        <AlertTriangle className="h-3.5 w-3.5" /> Not saved
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-neutral-500">
+      <Cloud className="h-3.5 w-3.5" /> Saved
+    </span>
   );
 };
