@@ -81,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: "My Account", href: "/settings/account" },
       { label: "Manage Users", href: "/admin/users" },
       { label: "Workspace", href: "/settings/workspace" },
+      { label: "Shares & Access", href: "/settings/shares" },
     ],
   },
 ];

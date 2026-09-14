@@ -17,6 +17,8 @@ const toPlaylist = (playlist: ApiPlaylist): Playlist => {
     updatedAt: playlist.updated_at,
     createdAt: playlist.created_at,
     clipIds: orderedClipIds,
+    canEdit: playlist.can_edit,
+    isOwner: playlist.is_owner,
   };
 };
 

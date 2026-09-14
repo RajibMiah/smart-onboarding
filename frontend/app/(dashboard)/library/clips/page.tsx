@@ -6,12 +6,14 @@ import { Video } from "lucide-react";
 
 import { ClipListItem } from "@/components/library/ClipListItem";
 import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
+import { DeleteConfirmationModal } from "@/components/library/modals/DeleteConfirmationModal";
 import { ShareModal } from "@/components/library/ShareModal";
 import { EditorialFilterBar, type FilterChip } from "@/components/ui/EditorialFilterBar";
 import { Toast } from "@/components/ui/Toast";
 import { useClips } from "@/hooks/useClips";
 import { useLibraryFilter } from "@/hooks/useLibraryFilter";
 import { useToast } from "@/hooks/useToast";
+import { purgeClipFromLocalCache } from "@/lib/editor/project-cache";
 import { DEFAULT_SORT_OPTIONS, type LibrarySortOption, type LibraryStatusFilter } from "@/types/library";
 
 const STATUS_CHIPS: FilterChip[] = [
@@ -33,9 +35,12 @@ const ClipsLibraryPageContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
-  const { clips, isLoading, error, removeClip, duplicateClip, renameClip } = useClips();
+  const { clips, isLoading, error, removeClip, duplicateClip, renameClip, updateClipVisibility, updateClipThumbnail } =
+    useClips();
   const [view, setView] = useState<"cards" | "table">("cards");
   const [shareTarget, setShareTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; playlistCount: number } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // The Review page's overwrite-confirmation flow lands here with `?updated=1`
   // right after replacing an existing clip in place — surface that as a
@@ -62,6 +67,37 @@ const ClipsLibraryPageContent = () => {
       void renameClip(id, next);
     },
     [renameClip],
+  );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await removeClip(deleteTarget.id);
+      await purgeClipFromLocalCache(deleteTarget.id);
+      toast.show("Clip deleted.");
+      setDeleteTarget(null);
+    } catch {
+      toast.show("Couldn't delete this clip — please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteTarget, removeClip, toast]);
+
+  const handleVisibilityChange = useCallback(
+    (id: string, visibility: Parameters<typeof updateClipVisibility>[1]) => {
+      void updateClipVisibility(id, visibility).catch(() => toast.show("Couldn't update this clip's visibility."));
+    },
+    [updateClipVisibility, toast],
+  );
+
+  const handleThumbnailChange = useCallback(
+    (id: string, file: File) => {
+      void updateClipThumbnail(id, file)
+        .then(() => toast.show("Thumbnail updated."))
+        .catch(() => toast.show("Couldn't update this clip's thumbnail."));
+    },
+    [updateClipThumbnail, toast],
   );
 
   const hasAnyClips = clips.length > 0;
@@ -132,8 +168,10 @@ const ClipsLibraryPageContent = () => {
               onRename={() => handleRename(clip.id, clip.title)}
               onMoveToProject={() => toast.show("Projects aren't available yet — check back soon.")}
               onDuplicate={() => void duplicateClip(clip.id)}
-              onDelete={() => void removeClip(clip.id)}
+              onDelete={() => setDeleteTarget({ id: clip.id, title: clip.title, playlistCount: clip.playlistCount })}
               onShare={() => setShareTarget({ id: clip.id, title: clip.title })}
+              onVisibilityChange={(visibility) => handleVisibilityChange(clip.id, visibility)}
+              onThumbnailChange={(file) => handleThumbnailChange(clip.id, file)}
             />
           ))}
         </div>
@@ -147,6 +185,16 @@ const ClipsLibraryPageContent = () => {
         contentType="clip"
         objectId={shareTarget?.id ?? ""}
         contentTitle={shareTarget?.title ?? ""}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={deleteTarget !== null}
+        isDeleting={isDeleting}
+        contentType="clip"
+        title={deleteTarget?.title ?? ""}
+        playlistCount={deleteTarget?.playlistCount}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleConfirmDelete()}
       />
     </div>
   );

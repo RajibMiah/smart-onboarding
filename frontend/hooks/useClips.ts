@@ -19,13 +19,18 @@ const toClipItem = (clip: ApiClip): ClipItem => {
     id: clip.id,
     title: clip.title,
     thumbnailUrl: clip.thumbnail_url || undefined,
+    videoUrl: clip.assets.find((asset) => asset.asset_type === "video")?.file_url || undefined,
     durationSeconds: Math.round(Number(clip.duration_seconds)),
     status: clip.visibility === "published" ? "published" : "draft",
+    visibility: clip.visibility,
     createdAt: clip.created_at,
     updatedAt: clip.updated_at,
     views: 0,
     likes: 0,
     comments: 0,
+    canEdit: clip.can_edit,
+    isOwner: clip.is_owner,
+    playlistCount: clip.playlist_count,
   };
 };
 
@@ -122,5 +127,34 @@ export const useClips = () => {
     }
   }, []);
 
-  return { clips, isLoading, error, refresh, createClip, removeClip, duplicateClip, renameClip };
+  const updateClipVisibility = useCallback(async (id: string, visibility: ClipVisibility) => {
+    const previous = clips;
+    setClips((prev) =>
+      prev.map((clip) => (clip.id === id ? { ...clip, visibility, status: visibility === "published" ? "published" : "draft" } : clip)),
+    );
+    try {
+      await clipsApi.update(id, { visibility });
+    } catch {
+      setClips(previous);
+      throw new Error("Couldn't update this clip's visibility.");
+    }
+  }, [clips]);
+
+  const updateClipThumbnail = useCallback(async (id: string, file: Blob) => {
+    const updated = await clipsApi.uploadThumbnail(id, file);
+    setClips((prev) => prev.map((clip) => (clip.id === id ? toClipItem(updated) : clip)));
+  }, []);
+
+  return {
+    clips,
+    isLoading,
+    error,
+    refresh,
+    createClip,
+    removeClip,
+    duplicateClip,
+    renameClip,
+    updateClipVisibility,
+    updateClipThumbnail,
+  };
 };

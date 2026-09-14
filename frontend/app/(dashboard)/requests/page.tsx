@@ -89,14 +89,8 @@ const RequestsPage = () => {
   }, [rawRequests, filterOption, search]);
 
   const openReview = (request: MediaShareRequest) => {
-    // The Review page has no deep-link support of its own — it only reads
-    // from the Studio session's already-hydrated EditorContext state (set by
-    // navigating through Studio first, or by useReviewWorkflow's own
-    // resume-by-id effect). Routing straight to `/studio/review` here would
-    // land on an empty page, so this goes through the same `?clip=` resume
-    // entry point the Library already uses.
     if (request.contentType === "clip") {
-      router.push(`/studio?clip=${request.objectId}`);
+      router.push(`/library/clips/${request.objectId}/watch`);
     } else {
       router.push(`/library/playlists/${request.objectId}/theater`);
     }
@@ -162,7 +156,7 @@ const RequestsPage = () => {
           <Inbox className="h-6 w-6 text-neutral-400" />
           <p className="text-sm font-medium text-neutral-600">No requests here</p>
           <p className="text-xs text-neutral-400">
-            Share a clip or playlist with "Send with Request" to ask a teammate for feedback or approval.
+            Share a clip or playlist with &quot;Send with Request&quot; to ask a teammate for feedback or approval.
           </p>
         </div>
       ) : (
@@ -178,7 +172,7 @@ const RequestsPage = () => {
                 >
                   {request.contentThumbnailUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- arbitrary thumbnail URL
-                    <img src={request.contentThumbnailUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={request.contentThumbnailUrl} alt="" crossOrigin="anonymous" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-neutral-300">
                       <Inbox className="h-6 w-6" />

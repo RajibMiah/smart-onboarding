@@ -15,6 +15,11 @@ export interface Playlist {
   updatedAt: string;
   createdAt: string;
   clipIds: string[];
+  /** May edit this playlist's content/structure — not by itself changing
+   *  visibility or deleting it, see `isOwner`. */
+  canEdit: boolean;
+  /** This playlist's own owner or a global admin. Gates changing visibility and deleting. */
+  isOwner: boolean;
 }
 
 export const PLAYLIST_SORT_OPTIONS: { value: PlaylistSortOption; label: string }[] = [

@@ -44,7 +44,7 @@ export const ProfileAvatarUploader = ({ initials, avatarUrl, isUploading, onUplo
       <div className="flex h-28 w-28 items-center justify-center overflow-hidden border-2 border-black bg-black text-3xl font-bold text-white">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- backend-hosted avatar URL
-          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+          <img src={avatarUrl} alt="" crossOrigin="anonymous" className="h-full w-full object-cover" />
         ) : (
           initials
         )}

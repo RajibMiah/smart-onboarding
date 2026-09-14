@@ -134,7 +134,7 @@ const VideoCard = ({ item }: { item: ContinuingItem }) => {
           item.thumbnailUrl ? (
             <div className="relative h-28 w-full">
               {/* eslint-disable-next-line @next/next/no-img-element -- backend-served thumbnail, arbitrary origin */}
-              <img src={item.thumbnailUrl} alt="" className="h-28 w-full object-cover" />
+              <img src={item.thumbnailUrl} alt="" crossOrigin="anonymous" className="h-28 w-full object-cover" />
               <span className="absolute inset-0 flex items-center justify-center">
                 <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white text-black">
                   <Play className="h-4 w-4 translate-x-px fill-current" />
@@ -150,7 +150,7 @@ const VideoCard = ({ item }: { item: ContinuingItem }) => {
           )
         }
       />
-      <EditorialCard.Footer label="▲ Open in Studio" href={`/studio?clip=${item.id}`} />
+      <EditorialCard.Footer label="▲ Watch Clip" href={`/library/clips/${item.id}/watch`} />
     </EditorialCard>
   );
 };

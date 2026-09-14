@@ -18,6 +18,7 @@ interface PlaylistListItemProps {
   onDuplicate?: () => void;
   onDelete?: () => void;
   onShare?: () => void;
+  onVisibilitySelect?: (visibility: "public" | "private") => void;
 }
 
 /** Clickable row -> `/library/playlists/[id]/theater`; the action menu stops propagation so it doesn't also navigate. */
@@ -31,6 +32,7 @@ export const PlaylistListItem = ({
   onDuplicate,
   onDelete,
   onShare,
+  onVisibilitySelect,
 }: PlaylistListItemProps) => {
   const router = useRouter();
 
@@ -58,7 +60,7 @@ export const PlaylistListItem = ({
           <div className="flex flex-1 items-center justify-center bg-neutral-50">
             {firstThumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- object-URL/arbitrary thumbnail
-              <img src={firstThumbnailUrl} alt="" className="h-full w-full object-cover" />
+              <img src={firstThumbnailUrl} alt="" crossOrigin="anonymous" className="h-full w-full object-cover" />
             ) : (
               <Ban className="h-6 w-6 text-neutral-300" aria-label="No videos" />
             )}
@@ -81,26 +83,58 @@ export const PlaylistListItem = ({
       </div>
 
       <div className="flex shrink-0 flex-col items-end justify-between gap-2">
-        <span
-          className={
-            playlist.visibility === "private"
-              ? "border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-xs text-red-600"
-              : "border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-xs text-emerald-600"
-          }
-        >
-          {playlist.visibility === "private" ? "Private" : "Public"}
-        </span>
+        {playlist.isOwner ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <select
+              value={playlist.visibility}
+              onChange={(event) => onVisibilitySelect?.(event.target.value as "public" | "private")}
+              aria-label="Playlist visibility"
+              className={
+                playlist.visibility === "private"
+                  ? "appearance-none border border-red-200 bg-red-50 py-0.5 pl-2 pr-5 font-mono text-xs text-red-600 focus:outline-none"
+                  : "appearance-none border border-emerald-200 bg-emerald-50 py-0.5 pl-2 pr-5 font-mono text-xs text-emerald-600 focus:outline-none"
+              }
+            >
+              <option value="private">Private</option>
+              <option value="public">Public</option>
+            </select>
+          </div>
+        ) : (
+          <span
+            className={
+              playlist.visibility === "private"
+                ? "border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-xs text-red-600"
+                : "border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-xs text-emerald-600"
+            }
+          >
+            {playlist.visibility === "private" ? "Private" : "Public"}
+          </span>
+        )}
 
         <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
           <ItemActionMenu
             itemLabel={playlist.title}
             items={[
-              { icon: Plus, label: "Add Clips", onClick: onAddClips },
-              { icon: Pencil, label: "Rename", onClick: onRename },
+              ...(playlist.canEdit
+                ? [
+                    { icon: Plus, label: "Add Clips", onClick: onAddClips },
+                    { icon: Pencil, label: "Rename", onClick: onRename },
+                  ]
+                : []),
               { icon: Share2, label: "Share & Request", onClick: onShare },
-              { icon: Eye, label: "Change Visibility", onClick: onChangeVisibility },
+              ...(playlist.isOwner ? [{ icon: Eye, label: "Change Visibility", onClick: onChangeVisibility }] : []),
               { icon: Copy, label: "Duplicate", onClick: onDuplicate },
-              { icon: Trash2, label: "Delete Playlist", tone: "danger", onClick: onDelete, dividerBefore: true },
+              ...(playlist.isOwner
+                ? [
+                    {
+                      icon: Trash2,
+                      label: "Delete Playlist",
+                      tone: "danger" as const,
+                      onClick: onDelete,
+                      dividerBefore: true,
+                    },
+                  ]
+                : []),
             ]}
           />
         </div>
