@@ -82,8 +82,6 @@ export function useStudioPersistence({
   /** `src` (object/http URL) -> already-persisted media_blobs id, so split segments and
    *  repeated placements of the same source media are stored once, not duplicated. */
   const mediaIdBySrcRef = useRef<Map<string, string>>(new Map());
-  /** Every object URL this hook has minted from restored Blobs, revoked together on unmount. */
-  const restoredObjectUrlsRef = useRef<string[]>([]);
 
   const refreshQuota = useCallback(() => {
     indexedDbStorage.checkStorageQuota().then(setQuota, () => {
@@ -117,7 +115,6 @@ export function useStudioPersistence({
           if (!blob) return null; // Media evicted or never finished saving — skip rather than break the whole restore.
           const src = URL.createObjectURL(blob);
           urlByMediaId.set(mediaId, src);
-          restoredObjectUrlsRef.current.push(src);
           return src;
         };
 
@@ -158,16 +155,18 @@ export function useStudioPersistence({
     return () => {
       cancelled = true;
     };
+    // A restored object URL is deliberately never revoked: `restoredProjectIds`
+    // (module scope, above) already guarantees this runs at most once per
+    // real page load, so there's no repeated-restore leak to guard against —
+    // and this hook's only caller, EditorLayoutInner, unmounts on every
+    // Studio <-> Review navigation while `EditorContext`'s state (and this
+    // exact URL, still sitting in `state.tracks[].src`) lives on underneath
+    // in the shared `EditorProvider`. An earlier version revoked on unmount
+    // "for cleanliness," which silently broke video playback the moment you
+    // clicked Next after a restore — the browser releases blob: URLs on its
+    // own when the tab actually closes or reloads, so there was nothing to
+    // clean up here in the first place.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- restore is mount-only, keyed by the stable projectId; `enabled` is fixed for the life of a mount too
-  }, [projectId]);
-
-  // Revoke every object URL this hook minted, on unmount (or project switch) only —
-  // not on every render, since the editor keeps using these URLs while mounted.
-  useEffect(() => {
-    return () => {
-      restoredObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      restoredObjectUrlsRef.current = [];
-    };
   }, [projectId]);
 
   const resolveMediaId = useCallback(async (src: string, duration: number): Promise<string> => {
