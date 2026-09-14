@@ -11,6 +11,24 @@ export const IDENTITY_ZOOM_TRANSFORM = "scale(1) translate(0%, 0%)";
  * result `transform-origin` would give, expressed the way the zoom-region
  * data is actually shaped (a bounding box, not a single origin point).
  *
+ * The translate percentage below is deliberately NOT divided by `scale`.
+ * `transform: scale(s) translate(tx%, ty%)` composes right-to-left — the
+ * element is conceptually translated by (tx, ty) first, and that shift is
+ * then itself scaled by `s` along with everything else. So the plain
+ * recenter offset `(0.5 - center) * 100%` already lands the region's
+ * midpoint exactly on the viewport center once `s` is applied on top of it;
+ * dividing by `s` first (a mistake it's easy to copy from a naive reading of
+ * "translate happens before scale, so pre-scale it down") would only
+ * recenter by 1/s of the needed distance, leaving the zoom pointed at the
+ * wrong spot.
+ *
+ * The recenter shift is clamped to `±(scale-1)/(2*scale)`: past that, the
+ * shift needed to center a focal point near an edge pulls real video past
+ * the viewport's opposite edge, exposing the container's own background
+ * where there's no video left to show. Clamping trades exact centering
+ * (the focal point lands slightly off-center, still fully in view) for
+ * guaranteeing the frame always stays filled with real pixels.
+ *
  * Apply this to a wrapper containing BOTH the `<video>` and the blur/text
  * overlay layer — never to the `<video>` element alone. Blur/text overlays
  * are positioned as percentages of that wrapper's own box; if only the
@@ -26,7 +44,17 @@ export const IDENTITY_ZOOM_TRANSFORM = "scale(1) translate(0%, 0%)";
  */
 export function computeZoomTransform(activeZoom: ZoomRegion | null): string {
   if (!activeZoom) return IDENTITY_ZOOM_TRANSFORM;
+  const { scale } = activeZoom;
   const centerX = activeZoom.bounds.x + activeZoom.bounds.width / 2;
   const centerY = activeZoom.bounds.y + activeZoom.bounds.height / 2;
-  return `scale(${activeZoom.scale}) translate(${(0.5 - centerX) * 100}%, ${(0.5 - centerY) * 100}%)`;
+
+  const maxShiftPercent = ((scale - 1) / (2 * scale)) * 100;
+  const shiftX = clampShift((0.5 - centerX) * 100, maxShiftPercent);
+  const shiftY = clampShift((0.5 - centerY) * 100, maxShiftPercent);
+
+  return `scale(${scale}) translate(${shiftX}%, ${shiftY}%)`;
+}
+
+function clampShift(value: number, maxAbs: number): number {
+  return Math.max(-maxAbs, Math.min(maxAbs, value));
 }
