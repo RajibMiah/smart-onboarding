@@ -85,10 +85,11 @@ const BRANDING_OPTIONS = ["Default", "APC Branded", "No Branding"];
  * silence handling, dictionary/publish toggles), wired through
  * `useAutoEditWorkflow` (form state) and `useAutoEditJob` (submits to the
  * real Celery pipeline, polls its status, and hydrates the result onto the
- * timeline — see that hook for why it needs an already-saved clip).
+ * timeline. A never-saved recording gets silently registered as a draft
+ * Clip on first use — see that hook's `ensureClipDraftSaved`.
  */
 export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
-  const { videoClips, state } = useEditor();
+  const { videoClips } = useEditor();
   const {
     config,
     setVoiceoverMode,
@@ -106,13 +107,7 @@ export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
   const canApply = hasMedia && !job.isProcessing;
   const isCustomSpeed = !SPEED_MULTIPLIERS.includes(config.silenceSpeedMultiplier);
 
-  const handleApply = () => {
-    if (!state.projectClipId) {
-      onNotify("Save this project first (Studio → Next → Done) — Auto-edit attaches its results to a saved clip.");
-      return;
-    }
-    void job.start(config);
-  };
+  const handleApply = () => void job.start(config);
 
   useEffect(() => {
     if (job.error) onNotify(job.error);
