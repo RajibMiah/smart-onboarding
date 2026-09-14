@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowRight, Cloud, Loader2, Trash2 } from "lucide-react"
 
 import { Toast } from "@/components/ui/Toast";
 import { useEditor } from "@/context/EditorContext";
+import { useAutoEditJob } from "@/hooks/useAutoEditJob";
 import { useMediaIngestion } from "@/hooks/useMediaIngestion";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import { useStudioPersistence } from "@/hooks/useStudioPersistence";
@@ -99,6 +100,27 @@ const EditorLayoutInner = () => {
     if (persistence.errorMessage) toast.show(persistence.errorMessage);
   }, [persistence.errorMessage, toast]);
 
+  // Owned here, not inside AutoEditPanel: that panel only exists in the DOM
+  // while "auto-edit" is the active tool rail selection (renderActivePanel
+  // below unmounts it the instant the user switches tools), but the job's
+  // submit-poll-hydrate cycle can easily outlive a few seconds of the user
+  // poking at other panels while they wait. A version of this hook that
+  // lived inside the panel cancelled its own polling on that unmount — the
+  // job would "finish" with nothing to show for it the moment you switched
+  // away and back, because the poll loop bailed out before ever calling
+  // hydrateResult. Living here (unmounted only by leaving Studio entirely)
+  // survives tool switches; it does not yet survive navigating to Review
+  // mid-job, a smaller, separate gap.
+  const autoEditJob = useAutoEditJob();
+
+  useEffect(() => {
+    if (autoEditJob.error) toast.show(autoEditJob.error);
+  }, [autoEditJob.error, toast]);
+
+  useEffect(() => {
+    if (autoEditJob.phase === "ready") toast.show("Auto-edit finished — results are on the timeline.");
+  }, [autoEditJob.phase, toast]);
+
   const openMediaPanel = useCallback(() => studioTool.openTool("media"), [studioTool]);
 
   const handleTurnSlides = useCallback(() => {
@@ -165,7 +187,7 @@ const EditorLayoutInner = () => {
   const renderActivePanel = (tool: StudioTool): ReactNode => {
     switch (tool) {
       case "auto-edit":
-        return <AutoEditPanel onNotify={toast.show} />;
+        return <AutoEditPanel onNotify={toast.show} job={autoEditJob} />;
       case "media":
         return (
           <MediaPanel
