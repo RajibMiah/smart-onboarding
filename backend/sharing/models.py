@@ -131,7 +131,36 @@ class SharedContent(TimeStampedModel):
         Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="content_shared_with_department"
     )
 
+    # `permission` is the tier the original, simple Share modal still writes
+    # (Can View / Can View & Comment / Can Edit) — kept as-is for that flow.
+    # The four booleans below are the independent capability toggles the
+    # Share Management dashboard edits directly; `perform_create` derives
+    # sensible defaults for them from `permission` so a share made through
+    # either path behaves consistently everywhere else in the app that reads
+    # them (streaming, edit/reorder gating, further-resharing).
     permission = models.CharField(max_length=20, choices=Permission.choices, default=Permission.VIEW)
+    can_view = models.BooleanField(default=True)
+    can_edit = models.BooleanField(default=False)
+    can_reorder = models.BooleanField(default=False)
+    can_reshare = models.BooleanField(default=False)
+
+    # Delegation chain: when the person creating this share is themselves a
+    # recipient (not the content's root owner), `parent_share` points at
+    # their own inbound share on the same content — this is what lets a
+    # root owner see every level of who-shared-with-whom, and what makes
+    # revoking one share cascade to everything delegated beneath it.
+    parent_share = models.ForeignKey(
+        "self", on_delete=models.CASCADE, null=True, blank=True, related_name="downstream_shares"
+    )
+
+    # Revocation is a soft-delete (`is_active=False`), not a row deletion —
+    # cascading to `downstream_shares` needs the row to still exist so the
+    # chain can be walked and so a revoked share's history stays auditable.
+    is_active = models.BooleanField(default=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="revoked_shares"
+    )
 
     class Meta:
         db_table = "apc_shared_content"
@@ -139,6 +168,8 @@ class SharedContent(TimeStampedModel):
         indexes = [
             models.Index(fields=["organization"]),
             models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["content_type", "object_id", "is_active"]),
+            models.Index(fields=["shared_by", "is_active"]),
         ]
 
     def clean(self) -> None:

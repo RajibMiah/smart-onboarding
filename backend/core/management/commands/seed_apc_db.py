@@ -237,7 +237,11 @@ class Command(BaseCommand):
             clip=clip,
             title="stark-demo.mp4",
             asset_type=MediaAsset.AssetType.VIDEO,
-            file_url="https://cdn.apc.local/mock/stark-demo.mp4",
+            # No file_url: this is metadata-only seed data (no real video
+            # bytes exist for it), and a fake domain here used to make the
+            # frontend player try to resolve `cdn.apc.local` — a host that
+            # was never real — hanging/erroring instead of showing the
+            # player's own honest "couldn't be loaded" state.
             mime_type="video/mp4",
             file_size_bytes=52_428_800,
             resolution="1920x1080",
@@ -311,7 +315,8 @@ class Command(BaseCommand):
                 clip=clip,
                 title=f"{clip.slug}.webm",
                 asset_type=MediaAsset.AssetType.VIDEO,
-                file_url=f"https://cdn.apc.local/mock/{clip.slug}.webm",
+                # No file_url — see the identical note on the Stark Industries
+                # seed clip above; `cdn.apc.local` was never a real host.
                 mime_type="video/webm",
                 file_size_bytes=random.randint(8_000_000, 60_000_000),
                 resolution="1920x1080",

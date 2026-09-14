@@ -31,6 +31,12 @@ services:
       - .env
     ports:
       - "8000:8000"
+    volumes:
+      # Without this, every rebuild (a plain image rebuild, not just a fresh
+      # `down`) wipes every uploaded avatar/clip/thumbnail — the container's
+      # own filesystem is ephemeral and MEDIA_ROOT has never been backed by
+      # anything durable.
+      - media_files:/app/mediafiles
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/auth/health/')"]
       interval: 10s
@@ -64,3 +70,4 @@ networks:
 
 volumes:
   mysql_data:
+  media_files:

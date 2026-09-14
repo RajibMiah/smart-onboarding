@@ -62,7 +62,7 @@ export const UserMenuDropdown = ({ user, avatarUrl, onStubAction }: UserMenuDrop
       >
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- object-URL avatar preview
-          <img src={avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+          <img src={avatarUrl} alt="" crossOrigin="anonymous" className="h-10 w-10 rounded-full object-cover" />
         ) : (
           <Avatar initials={user.initials} gradient="from-rose-500 to-orange-600" />
         )}

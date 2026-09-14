@@ -1,13 +1,19 @@
 /** Data models and query types shared by the My Library section (clips & pages). */
 
+import type { ClipVisibility } from "@/lib/api-client";
+
 export type LibraryStatus = "draft" | "published";
 
 export interface ClipItem {
   id: string;
   title: string;
   thumbnailUrl?: string;
+  /** The clip's own video asset URL — used as a live "first frame" preview
+   *  on the card when no thumbnail has been set. */
+  videoUrl?: string;
   durationSeconds: number;
   status: LibraryStatus;
+  visibility: ClipVisibility;
   /** ISO 8601 */
   createdAt: string;
   /** ISO 8601 */
@@ -15,6 +21,13 @@ export interface ClipItem {
   views: number;
   likes: number;
   comments: number;
+  /** May edit this clip's content — not by itself changing visibility or
+   *  deleting it, see `isOwner`. */
+  canEdit: boolean;
+  /** This clip's own creator or a global admin. Gates changing visibility and deleting. */
+  isOwner: boolean;
+  /** Distinct playlists this clip currently belongs to. */
+  playlistCount: number;
 }
 
 export interface PageItem {

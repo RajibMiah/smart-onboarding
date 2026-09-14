@@ -14,8 +14,8 @@ export const SharedFeedCard = ({ item }: SharedFeedCardProps) => {
   const router = useRouter();
 
   const open = () => {
-    if (item.contentType === "clip") router.push(`/studio?clip=${item.objectId}`);
-    else router.push(`/library/playlists/${item.objectId}`);
+    if (item.contentType === "clip") router.push(`/library/clips/${item.objectId}/watch`);
+    else router.push(`/library/playlists/${item.objectId}/theater`);
   };
 
   return (
@@ -27,7 +27,7 @@ export const SharedFeedCard = ({ item }: SharedFeedCardProps) => {
       <div className="h-16 w-24 shrink-0 overflow-hidden border border-black bg-neutral-100">
         {item.contentThumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- arbitrary thumbnail URL
-          <img src={item.contentThumbnailUrl} alt="" className="h-full w-full object-cover" />
+          <img src={item.contentThumbnailUrl} alt="" crossOrigin="anonymous" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-neutral-300">
             {item.contentType === "clip" ? <FileVideo className="h-5 w-5" /> : <Ban className="h-5 w-5" />}

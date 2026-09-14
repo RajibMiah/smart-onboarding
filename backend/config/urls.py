@@ -18,7 +18,9 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+
+from media.range_serve import serve_media_with_range
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -26,7 +28,10 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Range-aware in place of the stock `static()`/`django.views.static.serve`
+    # helper — see media/range_serve.py for why: without it, seeking a
+    # <video> to an unbuffered position re-downloads the whole file.
+    urlpatterns += [re_path(rf"^{settings.MEDIA_URL.lstrip('/')}(?P<path>.*)$", serve_media_with_range)]
     # gunicorn (unlike `runserver`) never auto-serves static files, so the
     # browsable API's CSS/JS 404 without this — collectstatic must have
     # already gathered them into STATIC_ROOT (done in docker-entrypoint.sh).

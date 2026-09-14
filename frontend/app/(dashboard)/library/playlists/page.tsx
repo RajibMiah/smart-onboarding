@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { ListVideo } from "lucide-react";
 
 import { LibraryEmptyState } from "@/components/library/LibraryEmptyState";
+import { DeleteConfirmationModal } from "@/components/library/modals/DeleteConfirmationModal";
 import { PlaylistListItem } from "@/components/library/PlaylistListItem";
 import { ShareModal } from "@/components/library/ShareModal";
 import { NEW_PLAYLIST_MODAL_ID, NewPlaylistModal } from "@/components/modals/NewPlaylistModal";
@@ -31,6 +32,8 @@ const PlaylistsLibraryPage = () => {
   } = usePlaylists();
   const { clips } = useClips();
   const [shareTarget, setShareTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filter = usePlaylistFilter({ playlists });
 
@@ -49,6 +52,20 @@ const PlaylistsLibraryPage = () => {
     },
     [setPlaylistVisibility],
   );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await removePlaylist(deleteTarget.id);
+      toast.show("Playlist deleted.");
+      setDeleteTarget(null);
+    } catch {
+      toast.show("Couldn't delete this playlist — please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteTarget, removePlaylist, toast]);
 
   const hasAnyPlaylists = playlists.length > 0;
 
@@ -127,8 +144,9 @@ const PlaylistsLibraryPage = () => {
                 onAddClips={() => toast.show("Adding existing clips to a playlist isn't available in this preview yet.")}
                 onRename={() => handleRename(playlist.id, playlist.title)}
                 onChangeVisibility={() => handleChangeVisibility(playlist.id, playlist.visibility)}
+                onVisibilitySelect={(visibility) => void setPlaylistVisibility(playlist.id, visibility)}
                 onDuplicate={() => void duplicatePlaylist(playlist.id)}
-                onDelete={() => void removePlaylist(playlist.id)}
+                onDelete={() => setDeleteTarget({ id: playlist.id, title: playlist.title })}
                 onShare={() => setShareTarget({ id: playlist.id, title: playlist.title })}
               />
             );
@@ -152,6 +170,15 @@ const PlaylistsLibraryPage = () => {
         contentType="playlist"
         objectId={shareTarget?.id ?? ""}
         contentTitle={shareTarget?.title ?? ""}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={deleteTarget !== null}
+        isDeleting={isDeleting}
+        contentType="playlist"
+        title={deleteTarget?.title ?? ""}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleConfirmDelete()}
       />
     </div>
   );
