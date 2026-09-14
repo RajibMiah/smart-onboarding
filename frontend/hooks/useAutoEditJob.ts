@@ -7,16 +7,20 @@ import {
   ApiError,
   autoEditApi,
   clipsApi,
+  mediaAssetsApi,
   timelineTracksApi,
   type ApiAutoEditResult,
   type ApiTranscriptSegment,
 } from "@/lib/api-client";
+import { defaultProjectTitle, slugify } from "@/lib/editor/project-defaults";
+import type { TimelineClip } from "@/lib/editor/types";
 import type { AutoEditConfig } from "./useAutoEditWorkflow";
 
 const POLL_INTERVAL_MS = 1500;
 
 export type AutoEditPhase =
   | "idle"
+  | "preparing"
   | "queued"
   | "transcribing"
   | "generating_script"
@@ -60,14 +64,23 @@ interface UseAutoEditJobResult {
  * the live `EditorContext` timeline the same way any other edit lands
  * there, so Undo/Redo and Review's save cover it for free.
  *
- * Requires an already-saved backend clip (`state.projectClipId`): a fresh,
- * never-saved recording has no id yet for the backend job to attach
- * results to (see the `useStudioPersistence` loss-proofing pass — a
- * deliberately separate decision from also auto-creating a backend Clip at
- * record time).
+ * The backend job is clip-scoped (`POST /clips/<id>/auto-edit/`), so a
+ * fresh, never-saved recording (`state.projectClipId` still null) needs a
+ * real backend `Clip` before it can run at all — `ensureClipDraftSaved`
+ * silently creates a minimal draft one and uploads the current primary
+ * video the first time `start` is called without one, rather than blocking
+ * the user with a "save first" error. `state.projectClipId` is stamped via
+ * `setProjectClipId` (not `loadProject`), so the rest of the in-progress
+ * session — tracks, regions, undo history — is left completely alone;
+ * Review's "Done" then sees this id already set and updates the same draft
+ * in place instead of creating a second clip.
+ *
+ * Trade-off worth knowing: if the user never reaches Review, this draft
+ * Clip is left behind (visible only to them, under "My Library", as a
+ * `draft`-visibility clip) rather than cleaned up automatically.
  */
 export function useAutoEditJob(): UseAutoEditJobResult {
-  const { state, addClip, updateClip, addCut } = useEditor();
+  const { state, addClip, updateClip, addCut, setProjectClipId } = useEditor();
   const [phase, setPhase] = useState<AutoEditPhase>("idle");
   const [phaseLabel, setPhaseLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -145,18 +158,55 @@ export function useAutoEditJob(): UseAutoEditJobResult {
     [addClip, addCut, updateClip, state.tracks],
   );
 
+  /** Creates a minimal draft `Clip` + uploads `videoClip`'s current blob so
+   *  a never-saved recording has a real backend id to run Auto-edit against.
+   *  Registers under `setProjectClipId` — see this hook's docstring for why
+   *  not `loadProject`. */
+  const ensureClipDraftSaved = useCallback(
+    async (videoClip: TimelineClip): Promise<string> => {
+      const title = defaultProjectTitle();
+      const clip = await clipsApi.create({
+        title,
+        slug: slugify(title),
+        visibility: "draft",
+        duration_seconds: Math.round(videoClip.duration),
+      });
+
+      const videoBlob = await fetch(videoClip.src).then((response) => response.blob());
+      await mediaAssetsApi.upload({ clip: clip.id, asset_type: "video", file: videoBlob });
+
+      setProjectClipId(clip.id);
+      return clip.id;
+    },
+    [setProjectClipId],
+  );
+
   const start = useCallback(
     async (config: AutoEditConfig) => {
-      const clipId = state.projectClipId;
-      if (!clipId) {
-        setPhase("failed");
-        setError("Save this project first (Studio → Next → Done) — Auto-edit attaches its results to a saved clip.");
-        return;
-      }
-
       cancelledRef.current = false;
       setError(null);
       setTranscriptSegments([]);
+
+      let clipId = state.projectClipId;
+      if (!clipId) {
+        const videoClip = state.tracks.find((track) => track.type === "video");
+        if (!videoClip) {
+          setPhase("failed");
+          setError("No recording on the timeline yet — record or upload a clip before running Auto-edit.");
+          return;
+        }
+
+        setPhase("preparing");
+        setPhaseLabel("Preparing recording for AI analysis...");
+        try {
+          clipId = await ensureClipDraftSaved(videoClip);
+        } catch (err) {
+          setPhase("failed");
+          setError(err instanceof ApiError ? err.message : "Couldn't prepare this recording for Auto-edit.");
+          return;
+        }
+      }
+
       setPhase("queued");
       setPhaseLabel("Queued...");
 
@@ -195,7 +245,7 @@ export function useAutoEditJob(): UseAutoEditJobResult {
         setError(err instanceof ApiError ? err.message : "Couldn't start Auto-edit.");
       }
     },
-    [state.projectClipId, hydrateResult],
+    [state.projectClipId, state.tracks, ensureClipDraftSaved, hydrateResult],
   );
 
   return {
