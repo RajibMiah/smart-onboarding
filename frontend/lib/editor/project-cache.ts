@@ -63,3 +63,22 @@ export async function cacheClipForOfflineEditing(input: CacheClipInput): Promise
     // Local caching is a pure optimization layered on top of an already-successful save/load.
   }
 }
+
+/**
+ * Clears everything a deleted clip left in IndexedDB — its cached project
+ * draft, every media blob that draft referenced, and any filmstrip
+ * thumbnails — so a deletion doesn't leave orphaned local storage behind.
+ * Best-effort and always runs after the backend delete already succeeded.
+ */
+export async function purgeClipFromLocalCache(clipId: string): Promise<void> {
+  try {
+    const draft = await indexedDbStorage.getProjectDraft(clipId);
+    if (draft) {
+      await Promise.all(draft.mediaIds.map((mediaId) => indexedDbStorage.deleteMediaBlob(mediaId)));
+      await indexedDbStorage.deleteProjectDraft(clipId);
+    }
+    await indexedDbStorage.clearThumbnailsForClip(clipId);
+  } catch {
+    // Best-effort — the backend delete above already succeeded regardless.
+  }
+}

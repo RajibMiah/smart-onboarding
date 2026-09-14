@@ -8,8 +8,8 @@ import { ItemActionMenu } from "@/components/library/ItemActionMenu";
 import { ShareModal } from "@/components/library/ShareModal";
 import { ClipDocumentationDeck } from "@/components/theater/ClipDocumentationDeck";
 import { NextUpOverlay } from "@/components/theater/NextUpOverlay";
+import { PlaybackControlDeck, type PlaybackSpeed } from "@/components/theater/PlaybackControlDeck";
 import { PlaylistQueueSidebar } from "@/components/theater/PlaylistQueueSidebar";
-import { VideoVolumeControl } from "@/components/theater/VideoVolumeControl";
 import { VideoReviewPlayer, type VideoReviewPlayerHandle } from "@/components/review/VideoReviewPlayer";
 import { Toast } from "@/components/ui/Toast";
 import { useUI } from "@/context/ui-context";
@@ -18,16 +18,16 @@ import { useToast } from "@/hooks/useToast";
 import { playlistsApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2] as const;
 const AUTO_ADVANCE_SECONDS = 3;
 
-/** The roles/flags allowed to reorder a playlist that isn't theirs — mirrors
- *  the backend's `_can_manage_playlist_sequence` check in collaboration/views.py. */
-const canManageSequence = (apiUser: ReturnType<typeof useUI>["apiUser"], ownerId: string | null): boolean => {
+/** Roles allowed to reorder a playlist beyond what `canEdit` already covers
+ *  (owner, global admin, or a delegated `edit` `SharedContent` grant) —
+ *  mirrors the extra role-tier allowances in the backend's
+ *  `_can_manage_playlist_sequence`, collaboration/views.py. */
+const hasReorderRole = (apiUser: ReturnType<typeof useUI>["apiUser"]): boolean => {
   if (!apiUser?.membership) return false;
-  if (ownerId && apiUser.id === ownerId) return true;
-  const { is_creator, is_global_admin, is_content_manager, role_tier } = apiUser.membership;
-  return is_creator || is_global_admin || is_content_manager || role_tier === "team_lead";
+  const { is_creator, is_content_manager, role_tier } = apiUser.membership;
+  return is_creator || is_content_manager || role_tier === "team_lead";
 };
 
 interface TheaterPageProps {
@@ -47,10 +47,10 @@ const TheaterView = ({ playlistId }: { playlistId: string }) => {
   const playerRef = useRef<VideoReviewPlayerHandle>(null);
 
   const [isShareOpen, setIsShareOpen] = useState(false);
-  const [speed, setSpeed] = useState<(typeof PLAYBACK_SPEEDS)[number]>(1);
+  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
   const [nextUpSecondsLeft, setNextUpSecondsLeft] = useState<number | null>(null);
 
-  const canReorder = canManageSequence(apiUser, theater.ownerId);
+  const canReorder = theater.canEdit || hasReorderRole(apiUser);
 
   // Reset the speed selector back to 1x whenever the active clip changes — a
   // fast clip's chosen rate shouldn't silently carry over onto the next one.
@@ -203,61 +203,17 @@ const TheaterView = ({ playlistId }: { playlistId: string }) => {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border border-black bg-white px-3 py-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => jumpBy(-5)}
-                className="border border-black px-2.5 py-1 text-xs font-semibold text-black transition hover:bg-neutral-100"
-              >
-                ⟲ 5s
-              </button>
-              <button
-                type="button"
-                onClick={() => jumpBy(5)}
-                className="border border-black px-2.5 py-1 text-xs font-semibold text-black transition hover:bg-neutral-100"
-              >
-                5s ⟳
-              </button>
-              <VideoVolumeControl getElement={() => playerRef.current?.getElement() ?? null} applyKey={theater.currentClip?.id} />
-            </div>
-
-            <div className="flex items-center gap-1">
-              <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Speed</span>
-              {PLAYBACK_SPEEDS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setSpeed(option)}
-                  className={cn(
-                    "border border-black px-2 py-1 text-xs font-bold transition",
-                    speed === option ? "bg-brand-yellow text-black" : "text-black hover:bg-neutral-100",
-                  )}
-                >
-                  {option}x
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!theater.hasPrev}
-                onClick={theater.prevClip}
-                className="border border-black px-3 py-1 text-xs font-semibold text-black transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                ← Previous
-              </button>
-              <button
-                type="button"
-                disabled={!theater.hasNext}
-                onClick={theater.nextClip}
-                className="border border-black bg-black px-3 py-1 text-xs font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next Clip ➔
-              </button>
-            </div>
-          </div>
+          <PlaybackControlDeck
+            getElement={() => playerRef.current?.getElement() ?? null}
+            volumeApplyKey={theater.currentClip?.id}
+            speed={speed}
+            onSpeedChange={setSpeed}
+            onJump={jumpBy}
+            hasPrevious={theater.hasPrev}
+            hasNext={theater.hasNext}
+            onPrevious={theater.prevClip}
+            onNext={theater.nextClip}
+          />
 
           {theater.currentClip && (
             <ClipDocumentationDeck

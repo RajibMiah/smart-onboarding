@@ -249,6 +249,16 @@ export interface ApiClip {
     noiseSuppression: boolean;
   };
   assets: ApiMediaAsset[];
+  /** May edit this clip's content (cuts, filters, metadata) — its own
+   *  creator, a global admin, or a delegated `can_edit` share. Does *not*
+   *  by itself permit changing visibility or deleting — see `is_owner`. */
+  can_edit: boolean;
+  /** This clip's own creator or a global admin — no delegated share
+   *  satisfies this, however broad. Gates changing visibility and deleting. */
+  is_owner: boolean;
+  /** How many distinct playlists this clip is currently in — surfaced by the
+   *  delete confirmation modal ("present in N playlists, will be unlinked"). */
+  playlist_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -293,6 +303,11 @@ export interface ApiPlaylist {
   cover_image_url: string;
   visibility: "public" | "private";
   items: ApiPlaylistItem[];
+  /** May edit this playlist's content/structure — not by itself changing
+   *  visibility or deleting it, see `is_owner`. */
+  can_edit: boolean;
+  /** This playlist's own owner or a global admin. Gates changing visibility and deleting. */
+  is_owner: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -480,6 +495,7 @@ export const clipsApi = {
     form.set("thumbnail", file, filename);
     return request<ApiClip>(`/clips/${id}/`, { method: "PATCH", body: form });
   },
+  watch: (id: string) => request<ApiClipWatch>(`/clips/${id}/watch/`),
 };
 
 // ---------------------------------------------------------------------------
@@ -683,6 +699,36 @@ export interface ApiTheaterClip extends ApiClip {
   tracks: ApiTimelineTrack[];
   step_guides: ApiStepGuide[];
   author_name: string;
+  author_avatar_url: string;
+  author_department: string | null;
+  author_team: string | null;
+}
+
+export interface ApiWatchPlaylistItem {
+  id: string;
+  title: string;
+  duration_seconds: string;
+  position: number;
+}
+
+export interface ApiWatchPlaylistContext {
+  id: string;
+  title: string;
+  items: ApiWatchPlaylistItem[];
+}
+
+export interface ApiRelatedClip {
+  id: string;
+  title: string;
+  duration_seconds: string;
+}
+
+/** Single-clip counterpart to `ApiPlaylistTheater` — everything the Clip
+ *  Watch page needs in one payload, including enough playlist context to
+ *  decide between the "sibling queue" and "standalone clip" sidebar. */
+export interface ApiClipWatch extends ApiTheaterClip {
+  playlist_context: ApiWatchPlaylistContext | null;
+  related_clips: ApiRelatedClip[];
 }
 
 export interface ApiPlaylistTheaterItem {
@@ -704,6 +750,11 @@ export interface ApiPlaylistTheater {
   description: string;
   visibility: "public" | "private";
   items: ApiPlaylistTheaterItem[];
+  /** May edit/reorder this playlist's content — not by itself changing
+   *  visibility or deleting it, see `is_owner`. */
+  can_edit: boolean;
+  /** This playlist's own owner or a global admin. Gates changing visibility and deleting. */
+  is_owner: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -823,6 +874,19 @@ export interface ApiSharedContent {
   target_department: string | null;
   target_department_name: string | null;
   permission: ApiSharePermission;
+  can_view: boolean;
+  can_edit: boolean;
+  can_reorder: boolean;
+  can_reshare: boolean;
+  parent_share: string | null;
+  is_active: boolean;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  revoked_by_name?: string;
+  /** Whether the current user may edit this row's flags or revoke it —
+   *  its issuer, the root content's owner, an admin, or a delegate holding
+   *  `can_reshare` on the underlying content. */
+  can_manage: boolean;
   created_at: string;
 }
 
@@ -835,11 +899,33 @@ export interface SharedContentPayload {
   permission: ApiSharePermission;
 }
 
+export interface ShareCapabilityUpdate {
+  can_view?: boolean;
+  can_edit?: boolean;
+  can_reorder?: boolean;
+  can_reshare?: boolean;
+}
+
+export interface ShareDashboardQuery {
+  scope?: "shared_by_me" | "shared_with_me";
+  status?: "active" | "revoked";
+  resource_type?: "clip" | "playlist";
+  target_type?: "user" | "team" | "department";
+  search?: string;
+}
+
 export const sharedContentApi = {
   list: (params: Record<string, string> = {}) =>
     request<Paginated<ApiSharedContent>>(`/shared-content/?${new URLSearchParams(params).toString()}`),
   create: (payload: SharedContentPayload) =>
     request<ApiSharedContent>("/shared-content/", { method: "POST", body: payload }),
+  updateCapabilities: (id: string, payload: ShareCapabilityUpdate) =>
+    request<ApiSharedContent>(`/shared-content/${id}/`, { method: "PATCH", body: payload }),
+  revoke: (id: string) => request<ApiSharedContent>(`/shared-content/${id}/revoke/`, { method: "POST" }),
+  dashboard: (query: ShareDashboardQuery = {}) => {
+    const params = new URLSearchParams(query as Record<string, string>);
+    return request<ApiSharedContent[]>(`/shared-content/dashboard/?${params.toString()}`);
+  },
 };
 
 export interface ApiSharedFeedItem {

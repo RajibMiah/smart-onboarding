@@ -217,7 +217,10 @@ export const useReviewWorkflow = ({ initialTitle, hasMedia }: UseReviewWorkflowO
           await mediaAssetsApi.upload({ clip: clipId, asset_type: "video", file: videoBlob });
 
           try {
-            const thumbnailBlob = await captureVideoFrame(primaryClip.src);
+            const thumbnailBlob = await captureVideoFrame(primaryClip.src, 0.1, {
+              cuts: state.cuts,
+              filters: state.filters,
+            });
             await clipsApi.uploadThumbnail(clipId, thumbnailBlob);
           } catch {
             // Thumbnail generation is best-effort — a missing thumbnail doesn't affect playback.

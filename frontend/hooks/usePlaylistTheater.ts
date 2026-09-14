@@ -158,6 +158,8 @@ export function usePlaylistTheater(playlistId: string) {
     playlistDescription: data?.description ?? "",
     playlistVisibility: data?.visibility ?? ("private" as const),
     ownerId: data?.owner ?? null,
+    canEdit: data?.can_edit ?? false,
+    isOwner: data?.is_owner ?? false,
     ownerName: data?.owner_name ?? "",
     ownerDepartment: data?.owner_department ?? null,
     ownerTeam: data?.owner_team ?? null,

@@ -134,14 +134,18 @@ export const VideoCanvas = ({
             filter: cssFilter,
           }}
           playsInline
-          // Without this, a clip resumed from the backend (a cross-origin URL
-          // relative to this Next.js origin) loads in no-cors mode and gets
-          // silently discarded as an opaque response by this app's COEP
-          // require-corp policy (set in next.config.ts for ffmpeg.wasm) —
-          // the video never plays and the playhead never advances, even
-          // though the backend already sends valid CORS headers. Harmless
-          // for local blob: URLs (recordings/uploads), which are same-origin.
-          crossOrigin="anonymous"
+          // `use-credentials`, not `anonymous`: a clip resumed from the
+          // backend is served by a view that authenticates via the JWT
+          // cookie (core/permissions + media/range_serve.py) — `anonymous`
+          // mode deliberately strips cookies from a cross-origin request, so
+          // the video would 404 as if no one were logged in at all, even
+          // with a fully valid session. `use-credentials` still requires (and
+          // gets) a real CORS response — the backend already sends a
+          // specific `Access-Control-Allow-Origin` plus
+          // `Access-Control-Allow-Credentials: true`, since a wildcard origin
+          // can't be paired with credentialed CORS. Harmless for local
+          // blob: URLs (recordings/uploads), which are same-origin regardless.
+          crossOrigin="use-credentials"
         />
 
         {state.isDrawingZoom && (

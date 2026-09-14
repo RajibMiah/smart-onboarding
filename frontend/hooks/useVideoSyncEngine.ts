@@ -44,7 +44,19 @@ export function useVideoSyncEngine(
   // Effects close over stale `project` on every render otherwise — this keeps
   // the single rAF loop below from having to restart every time cuts/zoom change.
   const projectRef = useRef(project);
-  projectRef.current = project;
+  useEffect(() => {
+    projectRef.current = project;
+  });
+  // Guards the cut-skip below against re-firing every animation frame: once
+  // `video.currentTime` is set to a cut's `endTime`, reading it back on the
+  // very next tick can land a hair *before* `endTime` (seek imprecision, not
+  // real playback progress) — still inside `[startTime, endTime)`, which
+  // without this guard re-triggers the same seek forever and freezes the
+  // player right at the boundary. Tracking the *id* of the cut already
+  // skipped (rather than a plain boolean) means back-to-back cuts each still
+  // get skipped once, and the guard clears itself the moment playback
+  // genuinely advances past `endTime` for real.
+  const skippedCutIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -55,8 +67,16 @@ export function useVideoSyncEngine(
       const { cuts, zoomRegions } = projectRef.current;
 
       const activeCut = cuts.find((cut) => cut.type === "cut" && time >= cut.startTime && time < cut.endTime);
-      if (activeCut) {
-        video.currentTime = activeCut.endTime;
+      if (activeCut && activeCut.id !== skippedCutIdRef.current) {
+        skippedCutIdRef.current = activeCut.id;
+        const duration = video.duration;
+        // A cut reaching (or essentially reaching) the end of the clip has
+        // nowhere valid to seek to — landing on/after `duration` can stall
+        // rather than cleanly reach `ended`, so let it play out instead.
+        video.currentTime =
+          Number.isFinite(duration) && activeCut.endTime >= duration - 0.05 ? duration : activeCut.endTime;
+      } else if (!activeCut) {
+        skippedCutIdRef.current = null;
       }
 
       const activeSpeedup = cuts.find(

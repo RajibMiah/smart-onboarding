@@ -103,7 +103,7 @@ export const PlaylistQueueSidebar = ({
               <div className="relative h-10 w-16 shrink-0 overflow-hidden border border-black bg-neutral-100">
                 {clip.thumbnailUrl && (
                   // eslint-disable-next-line @next/next/no-img-element -- arbitrary backend thumbnail URL
-                  <img src={clip.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={clip.thumbnailUrl} alt="" crossOrigin="anonymous" className="h-full w-full object-cover" />
                 )}
                 <span className="absolute bottom-0 right-0 bg-black px-1 font-mono text-[10px] text-white">
                   {formatDuration(clip.durationSeconds)}
