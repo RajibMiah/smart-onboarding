@@ -17,6 +17,8 @@ import {
 } from "@/lib/api-client";
 import { captureVideoFrame } from "@/lib/editor/capture-frame";
 import { cacheClipForOfflineEditing } from "@/lib/editor/project-cache";
+import { clearLocalProjectId, getOrCreateLocalProjectId } from "@/lib/editor/project-defaults";
+import indexedDbStorage from "@/services/indexedDbStorage";
 import type { DocumentationStep, ProcessingStatus } from "@/types/review";
 
 /** Simulated processing delay — there's no real transcoding backend yet. */
@@ -329,6 +331,14 @@ export const useReviewWorkflow = ({ initialTitle, hasMedia }: UseReviewWorkflowO
             filters: state.filters,
           });
         }
+
+        // The backend now has this project — the pre-save local draft
+        // (useStudioPersistence's crash/reload safety net, keyed by a
+        // browser-local id rather than this real clip id) is superseded by
+        // the mirror written above and would otherwise sit in IndexedDB
+        // forever, never looked up again under its old key.
+        void indexedDbStorage.deleteProjectDraft(getOrCreateLocalProjectId());
+        clearLocalProjectId();
 
         // "updated" only reflects a genuine in-place overwrite (`targetClipId`
         // truthy) — a fork created a brand new clip, so that toast wording

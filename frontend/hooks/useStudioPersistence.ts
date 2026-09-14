@@ -10,11 +10,30 @@ import type { ImageOverlayDraft, ProjectDraft, SaveStatus, StorageQuotaEstimate,
 
 const AUTO_SAVE_DEBOUNCE_MS = 1500;
 
+/**
+ * Module-scoped, not a ref: `EditorLayoutInner` (this hook's only caller)
+ * unmounts and remounts on every Studio <-> Review navigation even though
+ * `EditorContext`'s state survives underneath (same `EditorProvider`, shared
+ * by the layout). A ref would reset on each of those remounts and re-run the
+ * restore, clobbering in-session state (selection, undo/redo, any in-progress
+ * zoom-drawing) with whatever was last autosaved — a real regression from
+ * "coming back to Studio still has everything as I left it". A per-`projectId`
+ * flag scoped to the module survives remounts and only resets on an actual
+ * page load, which is the only time restoring should ever happen.
+ */
+const restoredProjectIds = new Set<string>();
+
 interface UseStudioPersistenceOptions {
   /** Stable id for this editing session's draft — a fresh recording's local project id, not a backend Clip id. */
   projectId: string;
   title: string;
   assignedPlaylistId?: string | null;
+  /** False for a session resuming an existing backend clip (`/studio?clip=<id>`) — that
+   *  flow already hydrates from and mirrors to IndexedDB itself (`app/studio/page.tsx`),
+   *  keyed by the same real clip id this hook would otherwise also try to restore/save
+   *  under, so leaving both engaged at once risks two effects racing to `loadProject` the
+   *  same draft on mount. Defaults to true (a fresh, not-yet-saved recording). */
+  enabled?: boolean;
 }
 
 interface UseStudioPersistenceResult {
@@ -46,16 +65,20 @@ export function useStudioPersistence({
   projectId,
   title,
   assignedPlaylistId = null,
+  enabled = true,
 }: UseStudioPersistenceOptions): UseStudioPersistenceResult {
   const { state, loadProject } = useEditor();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [quota, setQuota] = useState<StorageQuotaEstimate | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(true);
+  // Lazy initializer, not a plain `useState(true)`: a remount that already
+  // restored this `projectId` earlier in the page's lifetime (see
+  // `restoredProjectIds` above) should never show a "Restoring…" state at
+  // all, not even for one frame before an effect corrects it.
+  const [isRestoring, setIsRestoring] = useState(() => enabled && !restoredProjectIds.has(projectId));
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasRestoredRef = useRef(false);
   /** `src` (object/http URL) -> already-persisted media_blobs id, so split segments and
    *  repeated placements of the same source media are stored once, not duplicated. */
   const mediaIdBySrcRef = useRef<Map<string, string>>(new Map());
@@ -70,8 +93,13 @@ export function useStudioPersistence({
 
   // ---- Auto-restore on mount -------------------------------------------------
   useEffect(() => {
-    if (hasRestoredRef.current) return;
-    hasRestoredRef.current = true;
+    if (restoredProjectIds.has(projectId)) return;
+    restoredProjectIds.add(projectId);
+
+    // No setState here: the lazy initializer above already seeded
+    // `isRestoring` to `false` for a disabled session, so there's nothing to
+    // correct — only a real restore attempt needs to flip it back off later.
+    if (!enabled) return;
 
     let cancelled = false;
 
@@ -130,7 +158,7 @@ export function useStudioPersistence({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore is mount-only, keyed by the stable projectId
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore is mount-only, keyed by the stable projectId; `enabled` is fixed for the life of a mount too
   }, [projectId]);
 
   // Revoke every object URL this hook minted, on unmount (or project switch) only —
@@ -226,6 +254,7 @@ export function useStudioPersistence({
 
   // ---- Debounced auto-save on timeline/overlay changes -----------------------
   useEffect(() => {
+    if (!enabled) return;
     if (isRestoring) return; // Don't save over the draft mid-restore, or save an empty timeline before it loads.
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -236,6 +265,7 @@ export function useStudioPersistence({
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [
+    enabled,
     state.tracks,
     state.zoomRegions,
     state.blurRegions,
@@ -248,13 +278,15 @@ export function useStudioPersistence({
   ]);
 
   useEffect(() => {
+    if (!enabled) return;
     refreshQuota();
-  }, [refreshQuota]);
+  }, [enabled, refreshQuota]);
 
   const saveNow = useCallback(async () => {
+    if (!enabled) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     await persistDraft();
-  }, [persistDraft]);
+  }, [enabled, persistDraft]);
 
   const discardDraft = useCallback(async () => {
     await indexedDbStorage.deleteProjectDraft(projectId);

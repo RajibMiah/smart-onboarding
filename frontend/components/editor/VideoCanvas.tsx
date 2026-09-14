@@ -6,6 +6,7 @@ import { Camera, FolderOpen, Plus, ScanLine, Upload, UploadCloud } from "lucide-
 import { useEditor } from "@/context/EditorContext";
 import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
 import type { CanvasAspectRatio } from "@/lib/editor/types";
+import { computeZoomTransform } from "@/lib/editor/zoom-transform";
 
 import { BlurOverlay } from "./canvas/BlurOverlay";
 import { ImageOverlay } from "./canvas/ImageOverlay";
@@ -55,15 +56,14 @@ export const VideoCanvas = ({
 
   const hasMedia = videoClips.length > 0;
 
-  // Transform-origin (not translate) is what actually places the zoom: scaling
-  // around the region's own center reaches the same visual result as a
-  // scale+translate pair, without the extra offset math — and as the scale
-  // eases back to 1 on exit, the origin's position stops mattering, so the
-  // exit reads as smooth even though the origin snaps back immediately.
-  const videoTransform = activeZoomRegion ? `scale(${activeZoomRegion.scale})` : "scale(1)";
-  const videoTransformOrigin = activeZoomRegion
-    ? `${(activeZoomRegion.bounds.x + activeZoomRegion.bounds.width / 2) * 100}% ${(activeZoomRegion.bounds.y + activeZoomRegion.bounds.height / 2) * 100}%`
-    : "50% 50%";
+  // Shared with the Review/Watch/Theater player (lib/editor/zoom-transform.ts)
+  // so a region previewed here looks the same once it actually plays back.
+  // A plain `transform-origin` at the region's center (this file's old
+  // approach) pins that point in place rather than recentering it to the
+  // middle of the frame, so the preview never matched playback. This also
+  // clamps the recenter shift so a focal point drawn near an edge can't pull
+  // real video past the viewport and expose black margin on the far side.
+  const videoTransform = computeZoomTransform(activeZoomRegion);
 
   const handleMarqueePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = canvasBoxRef.current?.getBoundingClientRect();
@@ -129,7 +129,6 @@ export const VideoCanvas = ({
           style={{
             visibility: hasMedia ? "visible" : "hidden",
             transform: videoTransform,
-            transformOrigin: videoTransformOrigin,
             transition: "transform 300ms ease",
             filter: cssFilter,
           }}
