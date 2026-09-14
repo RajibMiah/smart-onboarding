@@ -15,14 +15,8 @@ import { Toast } from "@/components/ui/Toast";
 import { useEditor } from "@/context/EditorContext";
 import { useReviewWorkflow } from "@/hooks/useReviewWorkflow";
 import { useToast } from "@/hooks/useToast";
+import { defaultProjectTitle } from "@/lib/editor/project-defaults";
 import type { ProjectMetadataPayload } from "@/types/project";
-
-const defaultProjectTitle = (): string => {
-  const now = new Date();
-  const date = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  const time = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-  return `APC on ${date} at ${time}`;
-};
 
 const ReviewPage = () => {
   const router = useRouter();
