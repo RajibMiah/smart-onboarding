@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useId, useState, type ComponentType, type ReactNode } from "react";
+import { useId, useState, type ComponentType, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Info, Mic, Play, Sparkles, Zap } from "lucide-react";
 
 import { useEditor } from "@/context/EditorContext";
-import { useAutoEditJob } from "@/hooks/useAutoEditJob";
+import type { useAutoEditJob } from "@/hooks/useAutoEditJob";
 import {
   useAutoEditWorkflow,
   type SilenceStrategy,
@@ -16,6 +16,11 @@ import type { SharingOptionsConfig } from "@/types/sharingOptions";
 
 interface AutoEditPanelProps {
   onNotify: (message: string) => void;
+  /** Owned by EditorLayout, not this panel — it must keep running (and
+   *  eventually hydrate its result onto the timeline) even if the user
+   *  switches to a different tool while it's in flight, which unmounts
+   *  this panel. See EditorLayout.tsx's own comment on `autoEditJob`. */
+  job: ReturnType<typeof useAutoEditJob>;
 }
 
 const VOICEOVER_OPTIONS: { id: VoiceoverMode; title: string; description: string }[] = [
@@ -83,12 +88,15 @@ const BRANDING_OPTIONS = ["Default", "APC Branded", "No Branding"];
 /**
  * Auto-edit workflow form — fully interactive local config (voiceover mode,
  * silence handling, dictionary/publish toggles), wired through
- * `useAutoEditWorkflow` (form state) and `useAutoEditJob` (submits to the
- * real Celery pipeline, polls its status, and hydrates the result onto the
- * timeline. A never-saved recording gets silently registered as a draft
- * Clip on first use — see that hook's `ensureClipDraftSaved`.
+ * `useAutoEditWorkflow` (form state) and the `job` prop — `useAutoEditJob`
+ * submits to the real Celery pipeline, polls its status, and hydrates the
+ * result onto the timeline. A never-saved recording gets silently
+ * registered as a draft Clip on first use — see that hook's
+ * `ensureClipDraftSaved`. The job itself, and its completion/error toasts,
+ * are owned by EditorLayout (not this panel) so they survive the user
+ * switching to a different tool while it's in flight.
  */
-export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
+export const AutoEditPanel = ({ onNotify, job }: AutoEditPanelProps) => {
   const { videoClips } = useEditor();
   const {
     config,
@@ -99,7 +107,6 @@ export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
     setSilenceStrategy,
     setSilenceSpeedMultiplier,
   } = useAutoEditWorkflow();
-  const job = useAutoEditJob();
   const { config: sharingConfig, setField: setSharingField } = useSharingOptions();
   const [customSpeedOpen, setCustomSpeedOpen] = useState(false);
 
@@ -108,14 +115,6 @@ export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
   const isCustomSpeed = !SPEED_MULTIPLIERS.includes(config.silenceSpeedMultiplier);
 
   const handleApply = () => void job.start(config);
-
-  useEffect(() => {
-    if (job.error) onNotify(job.error);
-  }, [job.error, onNotify]);
-
-  useEffect(() => {
-    if (job.phase === "ready") onNotify("Auto-edit finished — results are on the timeline.");
-  }, [job.phase, onNotify]);
 
   const sharingSummary = (() => {
     const checked = SHARING_CHECKLIST.filter((item) => sharingConfig[item.key]).map((item) => item.title);
