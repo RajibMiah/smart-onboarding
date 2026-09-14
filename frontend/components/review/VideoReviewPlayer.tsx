@@ -6,6 +6,8 @@ import { useSafeVideoPlayback } from "@/hooks/useSafeVideoPlayback";
 import { useVideoSyncEngine } from "@/hooks/useVideoSyncEngine";
 import type { ProjectMetadataPayload } from "@/types/project";
 
+import { VideoPlaybackControls } from "./VideoPlaybackControls";
+
 export interface VideoReviewPlayerHandle {
   /** Exposed to `AppliedEditsSummary` so clicking an edit jumps the preview straight to it. */
   seekTo: (timestamp: number) => void;
@@ -27,17 +29,29 @@ interface VideoReviewPlayerProps {
 }
 
 /**
- * The Review/Theater playback surface: a single real `<video>` plus
- * hardware-accelerated CSS layered on top, all driven by `useVideoSyncEngine`
- * from the live `currentTime` — cuts are skipped, silence is sped up, zoom
- * regions transform the frame, and blur/text overlays render in sync, all
- * non-destructively. No transcoding, no server round-trip, no re-render of
- * the source media itself. `useSafeVideoPlayback` owns switching the
- * underlying element cleanly between sources — Theater reuses this one
- * player instance across every clip in a playlist rather than remounting it.
+ * The Review/Theater playback surface. Three strict DOM layers inside the
+ * outer shell:
+ *
+ * 1. The "zoom stage" (video + blur/text overlays, grouped under one
+ *    `transform`) — an active zoom region scales/translates this whole
+ *    layer, so overlay masks stay aligned with the footage they cover
+ *    instead of drifting once the video underneath them moves.
+ * 2. Status overlays (buffering/error/no-source) — centered, unscaled.
+ * 3. `VideoPlaybackControls` — play/pause, scrub, fullscreen, pinned to the
+ *    bottom edge with `transform: none`. This is why native `<video
+ *    controls>` isn't used here: the browser renders those as part of the
+ *    video element's own box, so they'd scale/distort with layer 1
+ *    regardless of which element the transform is attached to.
+ *
+ * `useVideoSyncEngine` drives layer 1's transform from the live
+ * `currentTime` — cuts are skipped, silence is sped up, all non-destructively.
+ * `useSafeVideoPlayback` owns switching the underlying element cleanly
+ * between sources — Theater reuses this one player instance across every
+ * clip in a playlist rather than remounting it.
  */
 export const VideoReviewPlayer = forwardRef<VideoReviewPlayerHandle, VideoReviewPlayerProps>(
   ({ project, onEnded, autoPlayOnChange = false }, ref) => {
+    const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const { currentTime, zoomTransform, seekTo } = useVideoSyncEngine(videoRef, project);
     const { isBuffering, hasError, errorDetail, retry } = useSafeVideoPlayback(videoRef, {
@@ -47,6 +61,18 @@ export const VideoReviewPlayer = forwardRef<VideoReviewPlayerHandle, VideoReview
 
     useImperativeHandle(ref, () => ({ seekTo, getElement: () => videoRef.current }), [seekTo]);
 
+    const toggleFullscreen = () => {
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+      } else {
+        // Fullscreens the *outer shell*, not just the <video> — so
+        // VideoPlaybackControls (a sibling of the zoom stage, not a child of
+        // the video) stays visible instead of being replaced by whatever
+        // fullscreen UI a fullscreened <video> element would show on its own.
+        void containerRef.current?.requestFullscreen();
+      }
+    };
+
     const activeBlurRegions = project.blurRegions.filter(
       (region) => currentTime >= region.startTime && currentTime <= region.endTime,
     );
@@ -55,34 +81,74 @@ export const VideoReviewPlayer = forwardRef<VideoReviewPlayerHandle, VideoReview
     );
 
     return (
-      <div className="relative aspect-video w-full overflow-hidden border border-black bg-black">
-        {/* crossOrigin="use-credentials", not "anonymous": this src is
-            served by a view that authenticates via the JWT cookie — "anonymous"
-            mode deliberately omits credentials from a cross-origin request,
-            which made every playback 404 as if no one were logged in, even
-            with a fully valid session (the backend already sends the specific,
-            non-wildcard Access-Control-Allow-Origin + Allow-Credentials
-            headers credentialed CORS requires). */}
-        <video
-          ref={videoRef}
-          // Omit `src` entirely rather than passing "" — an empty `src`
-          // attribute is a valid (empty) URL reference that resolves to the
-          // current page itself, so the browser would actually attempt to
-          // decode this HTML document as a video instead of just having no source.
-          src={project.primaryMediaUrl || undefined}
-          controls
-          crossOrigin="use-credentials"
-          onEnded={onEnded}
-          className="h-full w-full origin-center object-contain duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform"
-          style={{
-            filter: `brightness(${project.filters.brightness}%) contrast(${project.filters.contrast}%) saturate(${project.filters.saturation}%)`,
-            transform: zoomTransform,
-            transitionProperty: "transform",
-          }}
+      <div ref={containerRef} className="relative aspect-video w-full overflow-hidden border border-black bg-black">
+        {/* Layer 1: the zoom stage — video + overlays share one transform. */}
+        <div
+          className="absolute inset-0 overflow-hidden duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform"
+          style={{ transform: zoomTransform, transitionProperty: "transform" }}
         >
-          <track kind="captions" />
-        </video>
+          {/* crossOrigin="use-credentials", not "anonymous": this src is
+              served by a view that authenticates via the JWT cookie — "anonymous"
+              mode deliberately omits credentials from a cross-origin request,
+              which made every playback 404 as if no one were logged in, even
+              with a fully valid session (the backend already sends the specific,
+              non-wildcard Access-Control-Allow-Origin + Allow-Credentials
+              headers credentialed CORS requires). */}
+          <video
+            ref={videoRef}
+            // Omit `src` entirely rather than passing "" — an empty `src`
+            // attribute is a valid (empty) URL reference that resolves to the
+            // current page itself, so the browser would actually attempt to
+            // decode this HTML document as a video instead of just having no source.
+            src={project.primaryMediaUrl || undefined}
+            crossOrigin="use-credentials"
+            onEnded={onEnded}
+            className="h-full w-full object-contain"
+            style={{
+              filter: `brightness(${project.filters.brightness}%) contrast(${project.filters.contrast}%) saturate(${project.filters.saturation}%)`,
+            }}
+          >
+            <track kind="captions" />
+          </video>
 
+          {activeBlurRegions.map((region) => (
+            <div
+              key={region.id}
+              aria-hidden="true"
+              className="pointer-events-none absolute"
+              style={{
+                left: `${region.bounds.x * 100}%`,
+                top: `${region.bounds.y * 100}%`,
+                width: `${region.bounds.width * 100}%`,
+                height: `${region.bounds.height * 100}%`,
+                backdropFilter: `blur(${region.blurRadius}px)`,
+                WebkitBackdropFilter: `blur(${region.blurRadius}px)`,
+                borderRadius: region.shape === "ellipse" ? "9999px" : undefined,
+              }}
+            />
+          ))}
+
+          {activeTextOverlays.map((region) => (
+            <div
+              key={region.id}
+              className="pointer-events-none absolute whitespace-pre-wrap px-2 py-1"
+              style={{
+                left: `${region.bounds.x * 100}%`,
+                top: `${region.bounds.y * 100}%`,
+                width: `${region.bounds.width * 100}%`,
+                fontSize: region.style.fontSize,
+                fontWeight: region.style.fontWeight,
+                color: region.style.textColor,
+                backgroundColor: region.style.backgroundColor || undefined,
+                textAlign: region.style.textAlign,
+              }}
+            >
+              {region.content}
+            </div>
+          ))}
+        </div>
+
+        {/* Layer 2: status overlays — centered, never transformed. */}
         {!project.primaryMediaUrl ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/70">
             <span className="border border-neutral-500 bg-black px-3 py-1.5 font-mono text-[11px] font-semibold text-neutral-300">
@@ -114,41 +180,10 @@ export const VideoReviewPlayer = forwardRef<VideoReviewPlayerHandle, VideoReview
           )
         )}
 
-        {activeBlurRegions.map((region) => (
-          <div
-            key={region.id}
-            aria-hidden="true"
-            className="pointer-events-none absolute"
-            style={{
-              left: `${region.bounds.x * 100}%`,
-              top: `${region.bounds.y * 100}%`,
-              width: `${region.bounds.width * 100}%`,
-              height: `${region.bounds.height * 100}%`,
-              backdropFilter: `blur(${region.blurRadius}px)`,
-              WebkitBackdropFilter: `blur(${region.blurRadius}px)`,
-              borderRadius: region.shape === "ellipse" ? "9999px" : undefined,
-            }}
-          />
-        ))}
-
-        {activeTextOverlays.map((region) => (
-          <div
-            key={region.id}
-            className="pointer-events-none absolute whitespace-pre-wrap px-2 py-1"
-            style={{
-              left: `${region.bounds.x * 100}%`,
-              top: `${region.bounds.y * 100}%`,
-              width: `${region.bounds.width * 100}%`,
-              fontSize: region.style.fontSize,
-              fontWeight: region.style.fontWeight,
-              color: region.style.textColor,
-              backgroundColor: region.style.backgroundColor || undefined,
-              textAlign: region.style.textAlign,
-            }}
-          >
-            {region.content}
-          </div>
-        ))}
+        {/* Layer 3: static chrome controls — outside the zoom stage entirely. */}
+        {project.primaryMediaUrl && !hasError && (
+          <VideoPlaybackControls videoRef={videoRef} onToggleFullscreen={toggleFullscreen} />
+        )}
       </div>
     );
   },
