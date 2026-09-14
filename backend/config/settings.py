@@ -242,3 +242,25 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "APC <no-reply@apc.local>")
 # (e.g. the workspace-invitation accept link) — the backend has no other way
 # to know where the frontend is deployed.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+
+# Celery — async pipeline for the AI Auto-Edit & Voiceover workflow
+# (studio/tasks.py). Redis doubles as broker and result backend since
+# there's no other queue/cache in this stack yet to separate them onto.
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+# Custom phase states (studio/tasks.py's `self.update_state(state="TRANSCRIBING", ...)`
+# etc.) aren't in Celery's built-in READY_STATES, so without this a result
+# backend configured to expire never clears them — same TTL Celery's own
+# built-in states get by default.
+CELERY_RESULT_EXPIRES = int(os.getenv("CELERY_RESULT_EXPIRES", str(60 * 60 * 24)))
+
+# studio/services.py: local model endpoints for the AI Auto-Edit pipeline.
+# AI_AUTO_EDIT_USE_MOCK defaults to True because this stack doesn't actually
+# run Ollama (or Whisper/TTS) anywhere yet — see that module's docstring.
+AI_AUTO_EDIT_USE_MOCK = os.getenv("AI_AUTO_EDIT_USE_MOCK", "True") == "True"
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")

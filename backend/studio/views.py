@@ -2,12 +2,13 @@ from rest_framework import viewsets
 
 from core.permissions import IsWorkspaceMember
 
-from .models import BlurRegion, Cut, TextOverlay, TimelineTrack, ZoomRegion
+from .models import BlurRegion, Cut, TextOverlay, TimelineTrack, TranscriptSegment, ZoomRegion
 from .serializers import (
     BlurRegionSerializer,
     CutSerializer,
     TextOverlaySerializer,
     TimelineTrackSerializer,
+    TranscriptSegmentSerializer,
     ZoomRegionSerializer,
 )
 
@@ -57,3 +58,12 @@ class CutViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Cut.objects.filter(track__clip__organization_id=self.request.user.organization_id)
+
+
+class TranscriptSegmentViewSet(viewsets.ModelViewSet):
+    serializer_class = TranscriptSegmentSerializer
+    permission_classes = [IsWorkspaceMember]
+    filterset_fields = ["track"]
+
+    def get_queryset(self):
+        return TranscriptSegment.objects.filter(track__clip__organization_id=self.request.user.organization_id)
