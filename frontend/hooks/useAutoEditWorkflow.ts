@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 
 export type VoiceoverMode = "auto_generate" | "ai_voice_clone" | "keep_original";
 export type SilenceStrategy = "cut" | "speed_up";
@@ -35,22 +35,14 @@ const DEFAULT_CONFIG: AutoEditConfig = {
   },
 };
 
-const APPLY_DURATION_MS = 1200;
-
 /**
- * Owns the Auto-edit workflow form state. `applyWorkflow` is a timed stub —
- * there's no AI backend yet, so it just flips `isProcessing` for a beat and
- * reports back through `onNotify`, the same "not available in this offline
- * preview yet" convention the other Studio panels use.
+ * Owns the Auto-edit workflow form state (voiceover mode, silence handling,
+ * dictionary/context). Actually running the workflow is `useAutoEditJob`'s
+ * job — kept separate since this one is pure form state with no backend
+ * calls, reusable regardless of whether a job is in flight.
  */
 export const useAutoEditWorkflow = (initialConfig: AutoEditConfig = DEFAULT_CONFIG) => {
   const [config, setConfig] = useState<AutoEditConfig>(initialConfig);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-  }, []);
 
   const setVoiceoverMode = useCallback((voiceoverMode: VoiceoverMode) => {
     setConfig((prev) => ({ ...prev, voiceoverMode }));
@@ -76,24 +68,13 @@ export const useAutoEditWorkflow = (initialConfig: AutoEditConfig = DEFAULT_CONF
     setConfig((prev) => ({ ...prev, silenceSpeedMultiplier }));
   }, []);
 
-  const applyWorkflow = useCallback((onNotify: (message: string) => void) => {
-    setIsProcessing(true);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      setIsProcessing(false);
-      onNotify("Auto-edit workflow isn't available in this offline preview yet — your settings were saved.");
-    }, APPLY_DURATION_MS);
-  }, []);
-
   return {
     config,
-    isProcessing,
     setVoiceoverMode,
     setAdditionalContext,
     setUseDictionary,
     setShortenSilences,
     setSilenceStrategy,
     setSilenceSpeedMultiplier,
-    applyWorkflow,
   };
 };
