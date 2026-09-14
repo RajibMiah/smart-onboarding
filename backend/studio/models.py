@@ -131,3 +131,25 @@ class TextOverlay(TimedRegion):
 
     def __str__(self) -> str:
         return f"Text overlay {self.start_time}s-{self.end_time}s"
+
+
+class TranscriptSegment(TimedRegion):
+    """One AI Auto-Edit voiceover script line, anchored to an `audio`-type
+    track. `original_text` is what transcription produced verbatim;
+    `script_text` is the same span after script generation (cleaned up,
+    formalized, or synthesized from the user's context/dictionary depending
+    on the job's `voiceover_mode`) — kept separate so the Studio's transcript
+    panel can show what changed, not just the final result.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    track = models.ForeignKey(TimelineTrack, on_delete=models.CASCADE, related_name="transcript_segments")
+    original_text = models.TextField(blank=True)
+    script_text = models.TextField()
+
+    class Meta:
+        db_table = "apc_transcript_segments"
+        ordering = ["track", "start_time"]
+
+    def __str__(self) -> str:
+        return f"Transcript {self.start_time}s-{self.end_time}s"

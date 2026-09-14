@@ -46,6 +46,41 @@ services:
     networks:
       - smart-onboarding
 
+  redis:
+    image: redis:7-alpine
+    container_name: smart-onboarding-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - smart-onboarding
+
+  celery_worker:
+    build:
+      context: ./backend
+    container_name: smart-onboarding-celery-worker
+    restart: unless-stopped
+    # Runs the AI Auto-Edit pipeline (studio/tasks.py) — same image as
+    # `backend`, just a different process, so it shares that app's code,
+    # dependencies, and mediafiles volume without a second Dockerfile. Keeps
+    # the image's default entrypoint (docker-entrypoint.sh runs migrate +
+    # collectstatic before exec'ing this), just overrides the final command.
+    command: celery -A config worker --loglevel=info
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - media_files:/app/mediafiles
+    networks:
+      - smart-onboarding
+
   frontend:
     build:
       context: ./frontend
