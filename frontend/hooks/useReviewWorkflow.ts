@@ -17,7 +17,7 @@ import {
 } from "@/lib/api-client";
 import { captureVideoFrame } from "@/lib/editor/capture-frame";
 import { cacheClipForOfflineEditing } from "@/lib/editor/project-cache";
-import { clearLocalProjectId, getOrCreateLocalProjectId } from "@/lib/editor/project-defaults";
+import { clearLocalProjectId, getOrCreateLocalProjectId, slugify } from "@/lib/editor/project-defaults";
 import indexedDbStorage from "@/services/indexedDbStorage";
 import type { DocumentationStep, ProcessingStatus } from "@/types/review";
 
@@ -33,15 +33,6 @@ const PROCESSING_DURATION_MS = 3000;
  * total." Rounding to the same precision here keeps every save in bounds.
  */
 const toDecimalString = (value: number, decimalPlaces: number): string => value.toFixed(decimalPlaces);
-
-const slugify = (seed: string): string => {
-  const base = seed
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-  return `${base || "clip"}-${Date.now().toString(36)}`;
-};
 
 interface UseReviewWorkflowOptions {
   initialTitle: string;
