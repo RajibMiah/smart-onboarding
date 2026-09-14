@@ -5,7 +5,14 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from core.models import SystemRoleTier
-from core.permissions import IsProjectOwnerOrReadOnly, IsWorkspaceMember
+from core.permissions import (
+    IsOwnerOrDelegatedEditor,
+    IsProjectOwnerOrReadOnly,
+    IsWorkspaceMember,
+    scoped_to_visible,
+    user_has_share_capability,
+    user_is_owner_or_admin,
+)
 
 from .models import DocumentationPage, Playlist, PlaylistItem, StepGuide
 from .serializers import (
@@ -18,33 +25,58 @@ from .serializers import (
 
 
 def _can_manage_playlist_sequence(user, playlist: Playlist) -> bool:
-    """Reordering is deliberately broader than `IsProjectOwnerOrReadOnly`'s
-    plain owner check — the spec calls for Creators, Leads, and Admins to be
-    able to reorder a runbook even if they didn't create it, so this mirrors
-    the is_creator/is_global_admin/is_content_manager booleans that are the
-    source of truth for role checks elsewhere, plus the Team Lead tier which
-    has no boolean flag of its own."""
-    if playlist.owner_id == user.id:
+    """Reordering is deliberately broader than plain ownership: the owner, a
+    global admin, or anyone holding an active `can_reorder` grant via a
+    `SharedContent` row — independent of `can_edit`, since the Share
+    Management dashboard lets a creator toggle each capability separately.
+    Creators/Content Managers/Team Leads get it too even without an explicit
+    share, matching those roles' existing reach elsewhere in the app.
+    """
+    if user_has_share_capability(user, playlist, owner_field="owner", content_type="playlist", capability="can_reorder"):
         return True
     membership = getattr(user, "membership", None)
     if membership is None:
         return False
-    if membership.is_creator or membership.is_global_admin or membership.is_content_manager:
+    if membership.is_creator or membership.is_content_manager:
         return True
     return membership.role_tier == SystemRoleTier.TEAM_LEAD
 
 
 class PlaylistViewSet(viewsets.ModelViewSet):
     serializer_class = PlaylistSerializer
-    permission_classes = [IsWorkspaceMember, IsProjectOwnerOrReadOnly]
+    permission_classes = [IsWorkspaceMember, IsOwnerOrDelegatedEditor]
+    owner_field = "owner"
+    content_type = "playlist"
     filterset_fields = ["visibility", "owner"]
     search_fields = ["title", "description"]
 
     def get_queryset(self):
-        return Playlist.objects.for_user(self.request.user).prefetch_related("items")
+        # Same private-by-default rule as ClipViewSet: a private playlist is
+        # invisible outside its owner, a global admin, and anyone it's been
+        # explicitly shared with. `theater`/`reorder` below both go through
+        # this too, so a user who can't see a playlist can't play or resequence
+        # it either.
+        base = Playlist.objects.for_user(self.request.user).prefetch_related("items")
+        return scoped_to_visible(
+            base,
+            self.request.user,
+            owner_field="owner",
+            content_type="playlist",
+            public_visibility_value=Playlist.Visibility.PUBLIC,
+        )
 
     def perform_create(self, serializer):
         serializer.save(organization=self.request.user.organization, owner=self.request.user)
+
+    def perform_update(self, serializer):
+        # Same owner/admin-exclusive rule as ClipViewSet: a can_edit delegate
+        # may rename/restructure a playlist but not unilaterally change its
+        # visibility.
+        if "visibility" in self.request.data and not user_is_owner_or_admin(
+            self.request.user, serializer.instance, owner_field="owner"
+        ):
+            raise PermissionDenied("Only this playlist's owner or an admin can change its visibility.")
+        serializer.save()
 
     @action(detail=True, methods=["get"])
     def theater(self, request, pk=None):

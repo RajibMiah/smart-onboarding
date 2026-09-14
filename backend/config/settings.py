@@ -75,6 +75,18 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 CORS_ALLOW_CREDENTIALS = True
+# `Range` isn't one of the CORS "simple" headers and isn't in django-cors-headers'
+# own default allowlist — a <video crossOrigin="use-credentials"> element's
+# byte-range seek request is a credentialed cross-origin request that
+# triggers a real preflight, and without `range` explicitly allowed here that
+# preflight fails, silently blocking every seek (and, in browsers that probe
+# with an early range request on initial load, blocking playback outright).
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = [*default_headers, "range"]
+# Not required for a <video> tag itself (the browser's media engine reads
+# these natively), but exposes them to any `fetch`/XHR-based consumer too.
+CORS_EXPOSE_HEADERS = ["content-range", "accept-ranges", "content-length"]
 
 ROOT_URLCONF = "config.urls"
 

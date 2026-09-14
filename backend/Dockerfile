@@ -15,7 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh && chown -R django:django /app
+# .dockerignore excludes mediafiles/ from the build context (it's runtime
+# data, not source) — mkdir'ing it here, owned by django, means the named
+# volume docker-compose mounts over it inherits that ownership the first
+# time it's populated instead of defaulting to root-owned, which would
+# otherwise reject every upload with a permission error.
+RUN mkdir -p /app/mediafiles && chmod +x /app/docker-entrypoint.sh && chown -R django:django /app
 
 USER django
 EXPOSE 8000

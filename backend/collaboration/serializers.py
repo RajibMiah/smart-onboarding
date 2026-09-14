@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
+from core.permissions import user_can_edit_object, user_is_owner_or_admin
 from media.serializers import ClipSerializer
 from studio.serializers import TimelineTrackSerializer
 
@@ -35,6 +36,8 @@ class PlaylistItemSerializer(serializers.ModelSerializer):
 
 class PlaylistSerializer(serializers.ModelSerializer):
     items = PlaylistItemSerializer(many=True, read_only=True)
+    can_edit = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Playlist
@@ -47,10 +50,24 @@ class PlaylistSerializer(serializers.ModelSerializer):
             "cover_image_url",
             "visibility",
             "items",
+            "can_edit",
+            "is_owner",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "organization", "owner", "created_at", "updated_at"]
+
+    def get_can_edit(self, obj: Playlist) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return user_can_edit_object(request.user, obj, owner_field="owner", content_type="playlist")
+
+    def get_is_owner(self, obj: Playlist) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return user_is_owner_or_admin(request.user, obj, owner_field="owner")
 
 
 class StepGuideSerializer(serializers.ModelSerializer):
@@ -79,9 +96,35 @@ class TheaterClipSerializer(ClipSerializer):
     tracks = TimelineTrackSerializer(many=True, read_only=True)
     step_guides = StepGuideSerializer(many=True, read_only=True)
     author_name = serializers.CharField(source="author.full_name", read_only=True)
+    author_avatar_url = serializers.SerializerMethodField()
+    author_department = serializers.SerializerMethodField()
+    author_team = serializers.SerializerMethodField()
 
     class Meta(ClipSerializer.Meta):
-        fields = [*ClipSerializer.Meta.fields, "tracks", "step_guides", "author_name"]
+        fields = [
+            *ClipSerializer.Meta.fields,
+            "tracks",
+            "step_guides",
+            "author_name",
+            "author_avatar_url",
+            "author_department",
+            "author_team",
+        ]
+
+    def get_author_avatar_url(self, obj) -> str:
+        author = obj.author
+        if author.avatar:
+            request = self.context.get("request")
+            return request.build_absolute_uri(author.avatar.url) if request else author.avatar.url
+        return author.avatar_url
+
+    def get_author_team(self, obj) -> str | None:
+        membership = obj.author.team_memberships.select_related("team").first()
+        return membership.team.name if membership else None
+
+    def get_author_department(self, obj) -> str | None:
+        membership = obj.author.team_memberships.select_related("team__department").first()
+        return membership.team.department.name if membership and membership.team.department else None
 
 
 class PlaylistTheaterItemSerializer(serializers.ModelSerializer):
@@ -105,6 +148,8 @@ class PlaylistTheaterSerializer(serializers.ModelSerializer):
     # `OrgMemberSerializer.get_team`/`get_department` already uses elsewhere.
     owner_department = serializers.SerializerMethodField()
     owner_team = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Playlist
@@ -119,9 +164,23 @@ class PlaylistTheaterSerializer(serializers.ModelSerializer):
             "description",
             "visibility",
             "items",
+            "can_edit",
+            "is_owner",
             "created_at",
             "updated_at",
         ]
+
+    def get_can_edit(self, obj: Playlist) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return user_can_edit_object(request.user, obj, owner_field="owner", content_type="playlist")
+
+    def get_is_owner(self, obj: Playlist) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return user_is_owner_or_admin(request.user, obj, owner_field="owner")
 
     def get_owner_team(self, obj: Playlist) -> str | None:
         membership = obj.owner.team_memberships.select_related("team").first()
