@@ -24,6 +24,7 @@ from studio.views import (
     CutViewSet,
     TextOverlayViewSet,
     TimelineTrackViewSet,
+    TranscriptSegmentViewSet,
     ZoomRegionViewSet,
 )
 
@@ -41,6 +42,7 @@ router.register("zoom-regions", ZoomRegionViewSet, basename="zoom-region")
 router.register("blur-regions", BlurRegionViewSet, basename="blur-region")
 router.register("text-overlays", TextOverlayViewSet, basename="text-overlay")
 router.register("cuts", CutViewSet, basename="cut")
+router.register("transcript-segments", TranscriptSegmentViewSet, basename="transcript-segment")
 router.register("playlists", PlaylistViewSet, basename="playlist")
 router.register("playlist-items", PlaylistItemViewSet, basename="playlist-item")
 router.register("pages", DocumentationPageViewSet, basename="page")

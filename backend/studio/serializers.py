@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import BlurRegion, Cut, TextOverlay, TimelineTrack, ZoomRegion
+from .models import BlurRegion, Cut, TextOverlay, TimelineTrack, TranscriptSegment, ZoomRegion
 
 
 class TimedRegionSerializer(serializers.ModelSerializer):
@@ -61,11 +61,41 @@ class CutSerializer(TimedRegionSerializer):
         return attrs
 
 
+class TranscriptSegmentSerializer(TimedRegionSerializer):
+    class Meta:
+        model = TranscriptSegment
+        fields = ["id", "track", "original_text", "script_text", "start_time", "end_time"]
+        read_only_fields = ["id"]
+
+
+class AutoEditRequestSerializer(serializers.Serializer):
+    """Validates the options payload for `POST /clips/<id>/auto-edit/` —
+    not a `ModelSerializer`: these are Celery task parameters, not fields on
+    a row of their own (see studio/tasks.py's `AI_AUTO_EDIT_USE_MOCK` note
+    for why nothing here persists as a "job" model)."""
+
+    voiceover_mode = serializers.ChoiceField(choices=["auto_generate", "ai_voice_clone", "keep_original"])
+    additional_context = serializers.CharField(required=False, allow_blank=True, default="")
+    use_dictionary = serializers.BooleanField(required=False, default=False)
+    custom_dictionary = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    shorten_silences = serializers.BooleanField(required=False, default=False)
+    silence_strategy = serializers.ChoiceField(choices=["cut", "speed_up"], required=False, default="speed_up")
+    silence_speed_multiplier = serializers.DecimalField(max_digits=4, decimal_places=2, required=False, default=2)
+
+    def validate(self, attrs: dict) -> dict:
+        if attrs.get("voiceover_mode") == "keep_original" and not attrs.get("shorten_silences"):
+            raise serializers.ValidationError(
+                "Keeping the original audio with silence-shortening off leaves nothing for Auto-edit to do."
+            )
+        return attrs
+
+
 class TimelineTrackSerializer(serializers.ModelSerializer):
     zoom_regions = ZoomRegionSerializer(many=True, read_only=True)
     blur_regions = BlurRegionSerializer(many=True, read_only=True)
     text_overlays = TextOverlaySerializer(many=True, read_only=True)
     cuts = CutSerializer(many=True, read_only=True)
+    transcript_segments = TranscriptSegmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = TimelineTrack
@@ -78,6 +108,7 @@ class TimelineTrackSerializer(serializers.ModelSerializer):
             "blur_regions",
             "text_overlays",
             "cuts",
+            "transcript_segments",
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]

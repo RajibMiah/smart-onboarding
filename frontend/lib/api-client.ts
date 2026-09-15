@@ -612,6 +612,15 @@ export interface ApiCut {
   end_time: string;
 }
 
+export interface ApiTranscriptSegment {
+  id: string;
+  track: string;
+  original_text: string;
+  script_text: string;
+  start_time: string;
+  end_time: string;
+}
+
 export interface ApiTimelineTrack {
   id: string;
   clip: string;
@@ -621,6 +630,7 @@ export interface ApiTimelineTrack {
   blur_regions: ApiBlurRegion[];
   text_overlays: ApiTextOverlay[];
   cuts: ApiCut[];
+  transcript_segments: ApiTranscriptSegment[];
   created_at: string;
 }
 
@@ -646,6 +656,49 @@ export const textOverlaysApi = {
 
 export const cutsApi = {
   create: (payload: Omit<ApiCut, "id">) => request<ApiCut>("/cuts/", { method: "POST", body: payload }),
+};
+
+// ---------------------------------------------------------------------------
+// AI Auto-Edit & Voiceover pipeline (studio/tasks.py, celery_worker)
+// ---------------------------------------------------------------------------
+
+export interface AutoEditRequestPayload {
+  voiceover_mode: "auto_generate" | "ai_voice_clone" | "keep_original";
+  additional_context: string;
+  use_dictionary: boolean;
+  custom_dictionary: string[];
+  shorten_silences: boolean;
+  silence_strategy: "cut" | "speed_up";
+  silence_speed_multiplier: number;
+}
+
+export interface ApiAutoEditResult {
+  clip_id: string;
+  mute_original_audio: boolean;
+  cut_track_id?: string;
+  cut_count?: number;
+  audio_track_id?: string;
+  audio_asset_id?: string;
+}
+
+/** `state`: Celery's own PENDING/SUCCESS/FAILURE plus this pipeline's custom
+ *  in-progress states (TRANSCRIBING, GENERATING_SCRIPT, SYNTHESIZING_VOICE,
+ *  READY) — see media/views.py's `_AUTO_EDIT_PHASE_BY_STATE`. `phase` is
+ *  always a ready-to-display label; use it directly rather than re-deriving
+ *  one from `state`. */
+export interface ApiAutoEditStatus {
+  task_id: string;
+  state: "PENDING" | "TRANSCRIBING" | "GENERATING_SCRIPT" | "SYNTHESIZING_VOICE" | "READY" | "SUCCESS" | "FAILURE";
+  phase: string;
+  result?: ApiAutoEditResult;
+  error?: string;
+}
+
+export const autoEditApi = {
+  start: (clipId: string, payload: AutoEditRequestPayload) =>
+    request<{ task_id: string; status: string }>(`/clips/${clipId}/auto-edit/`, { method: "POST", body: payload }),
+  status: (clipId: string, taskId: string) =>
+    request<ApiAutoEditStatus>(`/clips/${clipId}/ai-status/?task_id=${encodeURIComponent(taskId)}`),
 };
 
 // ---------------------------------------------------------------------------
