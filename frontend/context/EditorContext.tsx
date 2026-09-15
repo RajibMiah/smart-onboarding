@@ -104,6 +104,7 @@ type Action =
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET_PROJECT" }
+  | { type: "SET_PROJECT_CLIP_ID"; clipId: string }
   | {
       type: "LOAD_PROJECT";
       /** A real backend Clip id when resuming a saved clip; null for a local-only IndexedDB draft restore. */
@@ -399,6 +400,14 @@ const editorReducer = (state: EditorState, action: Action): EditorState => {
     case "RESET_PROJECT":
       return INITIAL_STATE;
 
+    // Deliberately not LOAD_PROJECT: this only stamps the id a session's
+    // in-flight edits now belong to on the backend (e.g. Auto-edit silently
+    // registering a draft Clip so it has somewhere to attach results) — it
+    // must never reset tracks/regions/history the way resuming a saved
+    // project does.
+    case "SET_PROJECT_CLIP_ID":
+      return { ...state, projectClipId: action.clipId };
+
     case "LOAD_PROJECT":
       return {
         ...INITIAL_STATE,
@@ -483,6 +492,9 @@ interface EditorContextValue {
   undo: () => void;
   redo: () => void;
   resetProject: () => void;
+  /** Stamps the backend Clip id this session's edits now belong to, without
+   *  resetting anything else — see the reducer case for why this isn't LOAD_PROJECT. */
+  setProjectClipId: (clipId: string) => void;
   loadProject: (payload: {
     clipId: string | null;
     tracks: TimelineClip[];
@@ -645,6 +657,7 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
   const resetProject = useCallback(() => dispatch({ type: "RESET_PROJECT" }), []);
+  const setProjectClipId = useCallback((clipId: string) => dispatch({ type: "SET_PROJECT_CLIP_ID", clipId }), []);
   const loadProject = useCallback(
     (payload: {
       clipId: string | null;
@@ -756,6 +769,7 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       undo,
       redo,
       resetProject,
+      setProjectClipId,
       loadProject,
     }),
     [
@@ -817,6 +831,7 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
       undo,
       redo,
       resetProject,
+      setProjectClipId,
       loadProject,
     ],
   );

@@ -35,3 +35,16 @@ export const clearLocalProjectId = (): void => {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(LOCAL_PROJECT_ID_STORAGE_KEY);
 };
+
+/** A unique-enough `Clip.slug` from a title — the backend enforces uniqueness
+ *  per organization, so a plain kebab-case title alone would collide across
+ *  two projects saved with the same default title; the trailing base36
+ *  timestamp is what actually guarantees uniqueness. */
+export const slugify = (seed: string): string => {
+  const base = seed
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return `${base || "clip"}-${Date.now().toString(36)}`;
+};

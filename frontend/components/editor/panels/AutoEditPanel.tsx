@@ -4,6 +4,7 @@ import { useId, useState, type ComponentType, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Info, Mic, Play, Sparkles, Zap } from "lucide-react";
 
 import { useEditor } from "@/context/EditorContext";
+import type { useAutoEditJob } from "@/hooks/useAutoEditJob";
 import {
   useAutoEditWorkflow,
   type SilenceStrategy,
@@ -15,6 +16,11 @@ import type { SharingOptionsConfig } from "@/types/sharingOptions";
 
 interface AutoEditPanelProps {
   onNotify: (message: string) => void;
+  /** Owned by EditorLayout, not this panel — it must keep running (and
+   *  eventually hydrate its result onto the timeline) even if the user
+   *  switches to a different tool while it's in flight, which unmounts
+   *  this panel. See EditorLayout.tsx's own comment on `autoEditJob`. */
+  job: ReturnType<typeof useAutoEditJob>;
 }
 
 const VOICEOVER_OPTIONS: { id: VoiceoverMode; title: string; description: string }[] = [
@@ -82,28 +88,33 @@ const BRANDING_OPTIONS = ["Default", "APC Branded", "No Branding"];
 /**
  * Auto-edit workflow form — fully interactive local config (voiceover mode,
  * silence handling, dictionary/publish toggles), wired through
- * `useAutoEditWorkflow`. "Apply Workflow" is a timed stub: there's no AI
- * backend yet, so it reports back via `onNotify` like the other panels.
+ * `useAutoEditWorkflow` (form state) and the `job` prop — `useAutoEditJob`
+ * submits to the real Celery pipeline, polls its status, and hydrates the
+ * result onto the timeline. A never-saved recording gets silently
+ * registered as a draft Clip on first use — see that hook's
+ * `ensureClipDraftSaved`. The job itself, and its completion/error toasts,
+ * are owned by EditorLayout (not this panel) so they survive the user
+ * switching to a different tool while it's in flight.
  */
-export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
+export const AutoEditPanel = ({ onNotify, job }: AutoEditPanelProps) => {
   const { videoClips } = useEditor();
   const {
     config,
-    isProcessing,
     setVoiceoverMode,
     setAdditionalContext,
     setUseDictionary,
     setShortenSilences,
     setSilenceStrategy,
     setSilenceSpeedMultiplier,
-    applyWorkflow,
   } = useAutoEditWorkflow();
   const { config: sharingConfig, setField: setSharingField } = useSharingOptions();
   const [customSpeedOpen, setCustomSpeedOpen] = useState(false);
 
   const hasMedia = videoClips.length > 0;
-  const canApply = hasMedia && !isProcessing;
+  const canApply = hasMedia && !job.isProcessing;
   const isCustomSpeed = !SPEED_MULTIPLIERS.includes(config.silenceSpeedMultiplier);
+
+  const handleApply = () => void job.start(config);
 
   const sharingSummary = (() => {
     const checked = SHARING_CHECKLIST.filter((item) => sharingConfig[item.key]).map((item) => item.title);
@@ -334,19 +345,36 @@ export const AutoEditPanel = ({ onNotify }: AutoEditPanelProps) => {
       </div>
 
       <div className="border-t-2 border-black p-3">
+        {job.isProcessing && (
+          <div className="mb-2 border border-black bg-neutral-100 px-2.5 py-1.5 text-center font-mono text-[11px] font-semibold text-black">
+            {job.phaseLabel}
+          </div>
+        )}
+
+        {!job.isProcessing && job.transcriptSegments.length > 0 && (
+          <div className="mb-2 max-h-32 overflow-y-auto border border-black/20">
+            {job.transcriptSegments.map((segment) => (
+              <p key={segment.id} className="border-b border-black/10 p-2 text-xs text-black last:border-b-0">
+                <span className="mr-1.5 font-mono text-[10px] text-neutral-400">{segment.startTime.toFixed(1)}s</span>
+                {segment.scriptText}
+              </p>
+            ))}
+          </div>
+        )}
+
         <button
           type="button"
           disabled={!canApply}
-          onClick={() => applyWorkflow(onNotify)}
+          onClick={handleApply}
           className={cn(
-            "flex w-full items-center justify-center gap-2 border py-3 text-xs font-bold uppercase tracking-wider transition",
+            "flex w-full items-center justify-center gap-2 border-2 py-3 text-xs font-bold uppercase tracking-wider transition",
             canApply
-              ? "border-black bg-black text-white hover:bg-neutral-800"
+              ? "border-black bg-brand-yellow text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:bg-yellow-400"
               : "cursor-not-allowed border-black/20 bg-neutral-100 text-neutral-400",
           )}
         >
           <Play className="h-3.5 w-3.5" />
-          {isProcessing ? "Applying…" : "Apply Workflow"}
+          {job.isProcessing ? "Generating…" : "✨ Generate AI Voiceover & Edits"}
         </button>
       </div>
     </div>

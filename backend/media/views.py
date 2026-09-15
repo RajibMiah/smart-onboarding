@@ -1,13 +1,30 @@
-from rest_framework import viewsets
+from celery.result import AsyncResult
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from core.permissions import IsOwnerOrDelegatedEditor, IsWorkspaceMember, scoped_to_visible, user_is_owner_or_admin
+from studio.serializers import AutoEditRequestSerializer
+from studio.tasks import process_ai_auto_edit
 
 from .models import Clip, MediaAsset
 from .serializers import ClipSerializer, MediaAssetSerializer
+
+# Celery task phase -> the Studio drawer's four named pipeline steps
+# (AutoEditPanel.tsx's progress banner). PENDING/SUCCESS/FAILURE are Celery's
+# own built-in states; the rest are custom states studio/tasks.py reports via
+# `self.update_state(...)` as the pipeline progresses.
+_AUTO_EDIT_PHASE_BY_STATE = {
+    "PENDING": "Queued...",
+    "TRANSCRIBING": "Transcribing...",
+    "GENERATING_SCRIPT": "Ollama Generating Script...",
+    "SYNTHESIZING_VOICE": "Synthesizing Voice...",
+    "READY": "Ready",
+    "SUCCESS": "Ready",
+    "FAILURE": "Failed",
+}
 
 
 class ClipViewSet(viewsets.ModelViewSet):
@@ -94,6 +111,51 @@ class ClipViewSet(viewsets.ModelViewSet):
             for related in self.get_queryset().filter(author_id=clip.author_id).exclude(id=clip.id).order_by("-created_at")[:5]
         ]
         return Response(data)
+
+    @action(detail=True, methods=["post"], url_path="auto-edit")
+    def auto_edit(self, request, pk=None):
+        """Launches the AI Auto-Edit & Voiceover pipeline (studio/tasks.py)
+        for this clip in the background and returns immediately — this
+        clip must already be saved to the backend (a fresh, never-saved
+        recording has no `id` here yet; the Studio drawer surfaces that as
+        "save this project first" rather than calling this)."""
+        clip = self.get_object()
+        serializer = AutoEditRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        options = dict(serializer.validated_data)
+        # DecimalField survives inside this process, but Celery's task
+        # message is JSON over the wire — stringify explicitly rather than
+        # relying on however kombu's encoder happens to round-trip Decimal.
+        options["silence_speed_multiplier"] = str(options["silence_speed_multiplier"])
+
+        task = process_ai_auto_edit.delay(str(clip.id), str(request.user.id), options)
+        return Response({"task_id": task.id, "status": "processing"}, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["get"], url_path="ai-status")
+    def ai_status(self, request, pk=None):
+        """Polled by `useAutoEditJob` — `task_id` comes from `auto_edit`'s
+        response. Scoped under this clip's own detail route (permission-
+        checked via `get_object()`) even though the actual state lookup is
+        keyed by `task_id`, not `pk`, so one workspace member can't poll
+        another's job by guessing a task id."""
+        self.get_object()
+        task_id = request.query_params.get("task_id")
+        if not task_id:
+            return Response({"detail": "task_id query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = AsyncResult(task_id)
+        state = result.state
+        payload = {"task_id": task_id, "state": state, "phase": _AUTO_EDIT_PHASE_BY_STATE.get(state, state)}
+        if state == "SUCCESS":
+            payload["result"] = result.result
+        elif state == "FAILURE":
+            payload["error"] = str(result.info)
+        elif isinstance(result.info, dict):
+            # A custom in-progress state's `meta` (studio/tasks.py's
+            # `self.update_state(..., meta={"phase": ...})`) is the more
+            # specific, model-authored wording over the static table above.
+            payload["phase"] = result.info.get("phase", payload["phase"])
+        return Response(payload)
 
 
 class MediaAssetViewSet(viewsets.ModelViewSet):
