@@ -1,8 +1,17 @@
+"""
+File Introduction:
+Module: studio.views
+Role: HTTP entry points for timeline tracks and their timed regions.
+
+Responsibilities:
+- Routes requests to serializers and workspace-scoped selectors.
+"""
+
 from rest_framework import viewsets
 
 from core.permissions import IsWorkspaceMember
 
-from .models import BlurRegion, Cut, TextOverlay, TimelineTrack, TranscriptSegment, ZoomRegion
+from . import selectors
 from .serializers import (
     BlurRegionSerializer,
     CutSerializer,
@@ -19,9 +28,7 @@ class TimelineTrackViewSet(viewsets.ModelViewSet):
     filterset_fields = ["clip", "track_type"]
 
     def get_queryset(self):
-        return TimelineTrack.objects.filter(
-            clip__organization_id=self.request.user.organization_id
-        ).prefetch_related("zoom_regions", "blur_regions", "text_overlays", "cuts")
+        return selectors.timeline_tracks_for_organization(self.request.user.organization_id)
 
 
 class ZoomRegionViewSet(viewsets.ModelViewSet):
@@ -30,7 +37,7 @@ class ZoomRegionViewSet(viewsets.ModelViewSet):
     filterset_fields = ["track"]
 
     def get_queryset(self):
-        return ZoomRegion.objects.filter(track__clip__organization_id=self.request.user.organization_id)
+        return selectors.zoom_regions_for_organization(self.request.user.organization_id)
 
 
 class BlurRegionViewSet(viewsets.ModelViewSet):
@@ -39,7 +46,7 @@ class BlurRegionViewSet(viewsets.ModelViewSet):
     filterset_fields = ["track"]
 
     def get_queryset(self):
-        return BlurRegion.objects.filter(track__clip__organization_id=self.request.user.organization_id)
+        return selectors.blur_regions_for_organization(self.request.user.organization_id)
 
 
 class TextOverlayViewSet(viewsets.ModelViewSet):
@@ -48,7 +55,7 @@ class TextOverlayViewSet(viewsets.ModelViewSet):
     filterset_fields = ["track"]
 
     def get_queryset(self):
-        return TextOverlay.objects.filter(track__clip__organization_id=self.request.user.organization_id)
+        return selectors.text_overlays_for_organization(self.request.user.organization_id)
 
 
 class CutViewSet(viewsets.ModelViewSet):
@@ -57,7 +64,7 @@ class CutViewSet(viewsets.ModelViewSet):
     filterset_fields = ["track"]
 
     def get_queryset(self):
-        return Cut.objects.filter(track__clip__organization_id=self.request.user.organization_id)
+        return selectors.cuts_for_organization(self.request.user.organization_id)
 
 
 class TranscriptSegmentViewSet(viewsets.ModelViewSet):
@@ -66,4 +73,4 @@ class TranscriptSegmentViewSet(viewsets.ModelViewSet):
     filterset_fields = ["track"]
 
     def get_queryset(self):
-        return TranscriptSegment.objects.filter(track__clip__organization_id=self.request.user.organization_id)
+        return selectors.transcript_segments_for_organization(self.request.user.organization_id)

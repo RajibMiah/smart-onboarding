@@ -259,7 +259,7 @@ CELERY_RESULT_SERIALIZER = "json"
 # built-in states get by default.
 CELERY_RESULT_EXPIRES = int(os.getenv("CELERY_RESULT_EXPIRES", str(60 * 60 * 24)))
 
-# studio/services.py: local model endpoints for the AI Auto-Edit pipeline.
+# studio/services/handlers.py: local model endpoints for the AI Auto-Edit pipeline.
 # AI_AUTO_EDIT_USE_MOCK defaults to True because this stack doesn't actually
 # run Ollama (or Whisper/TTS) anywhere yet — see that module's docstring.
 AI_AUTO_EDIT_USE_MOCK = os.getenv("AI_AUTO_EDIT_USE_MOCK", "True") == "True"
