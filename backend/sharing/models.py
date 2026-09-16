@@ -1,14 +1,13 @@
-"""Send-with-Request sharing domain: maps to APC_MEDIA_SHARE_REQUESTS.
+"""
+File Introduction:
+Module: sharing.models
+Role: Send-with-Request sharing domain — content sharing, review requests, and notifications.
 
-Named `sharing` (not `requests`) as the Django app — a local package literally
-named `requests` would shadow the third-party `requests` HTTP library
-(installed as a transitive dependency), a classic Python footgun.
-
-`content_type`/`object_id` is a deliberately lightweight generic reference
-(a string type tag + UUID) rather than Django's full contenttypes framework —
-there are exactly two possible targets (Clip, Playlist) and both use UUID
-primary keys, so a real ContentType/GenericForeignKey adds indirection this
-doesn't need.
+Responsibilities:
+- Models plain shares (SharedContent) and review/approval requests (MediaShareRequest)
+  against a lightweight content_type/object_id reference (Clip or Playlist).
+- Represents share delegation chains via SharedContent.parent_share and soft-delete revocation.
+- Models in-app notifications delivered to users.
 """
 
 import uuid
@@ -53,14 +52,9 @@ class MediaShareRequest(TimeStampedModel):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="media_requests")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="initiated_requests")
 
-    # Shared resource — a lightweight generic reference (see module docstring).
     content_type = models.CharField(max_length=20, choices=ContentType.choices)
     object_id = models.UUIDField(db_index=True)
 
-    # Scoped targets — exactly one of these three is set (enforced in the
-    # serializer, since a `CheckConstraint` counting non-null FKs isn't
-    # portable/simple across MySQL versions the way a plain app-level
-    # validation is).
     target_user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_requests"
     )
@@ -99,13 +93,7 @@ class MediaShareRequest(TimeStampedModel):
 
 
 class SharedContent(TimeStampedModel):
-    """A plain share (no request attached) — the "Shared with me" feed's other half.
-
-    Sending a request through `MediaShareRequest` already implies a share,
-    so the feed endpoint (`sharing.views.shared_feed`) unions both tables;
-    this one exists for "just share the link" with no review/approval
-    workflow attached.
-    """
+    """A plain share (no request attached) — the "Shared with me" feed's other half."""
 
     class Permission(models.TextChoices):
         VIEW = "view", "Can View"
@@ -131,31 +119,16 @@ class SharedContent(TimeStampedModel):
         Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="content_shared_with_department"
     )
 
-    # `permission` is the tier the original, simple Share modal still writes
-    # (Can View / Can View & Comment / Can Edit) — kept as-is for that flow.
-    # The four booleans below are the independent capability toggles the
-    # Share Management dashboard edits directly; `perform_create` derives
-    # sensible defaults for them from `permission` so a share made through
-    # either path behaves consistently everywhere else in the app that reads
-    # them (streaming, edit/reorder gating, further-resharing).
     permission = models.CharField(max_length=20, choices=Permission.choices, default=Permission.VIEW)
     can_view = models.BooleanField(default=True)
     can_edit = models.BooleanField(default=False)
     can_reorder = models.BooleanField(default=False)
     can_reshare = models.BooleanField(default=False)
 
-    # Delegation chain: when the person creating this share is themselves a
-    # recipient (not the content's root owner), `parent_share` points at
-    # their own inbound share on the same content — this is what lets a
-    # root owner see every level of who-shared-with-whom, and what makes
-    # revoking one share cascade to everything delegated beneath it.
     parent_share = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="downstream_shares"
     )
 
-    # Revocation is a soft-delete (`is_active=False`), not a row deletion —
-    # cascading to `downstream_shares` needs the row to still exist so the
-    # chain can be walked and so a revoked share's history stays auditable.
     is_active = models.BooleanField(default=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     revoked_by = models.ForeignKey(

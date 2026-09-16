@@ -1,3 +1,14 @@
+"""
+File Introduction:
+Module: collaboration.serializers
+Role: Schema validation and payload formatting for playlists, documentation pages, and step guides.
+
+Responsibilities:
+- Validates and shapes Playlist, PlaylistItem, DocumentationPage, PageClipItem, and StepGuide payloads.
+- Composes the Playlist Theater's nested clip/track/step-guide payload (TheaterClipSerializer,
+  PlaylistTheaterSerializer).
+"""
+
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
@@ -11,20 +22,9 @@ from .models import DocumentationPage, PageClipItem, Playlist, PlaylistItem, Ste
 class PlaylistItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlaylistItem
-        fields = ["id", "playlist", "clip", "position", "added_at"]
-        # `position` is server-assigned in `PlaylistItemViewSet.perform_create`
-        # (always appends after the current max) — a client-supplied value
-        # could collide with the (playlist, position) unique constraint.
+        fields = "__all__"
         read_only_fields = ["id", "position", "added_at"]
-        # DRF auto-generates a unique-together validator per model
-        # UniqueConstraint, including (playlist, position) — but since
-        # `position` is read-only, it would validate against the model
-        # field's `default=0` before `perform_create` ever computes the real
-        # value, rejecting every playlist's second item as a false-positive
-        # collision with its first (both "true" position 0 at validation
-        # time). Declaring validators explicitly keeps the one that's safe to
-        # check up front (playlist+clip) and drops the other — the DB-level
-        # UniqueConstraint still backstops position uniqueness for real.
+
         validators = [
             UniqueTogetherValidator(
                 queryset=PlaylistItem.objects.all(),
@@ -73,25 +73,13 @@ class PlaylistSerializer(serializers.ModelSerializer):
 class StepGuideSerializer(serializers.ModelSerializer):
     class Meta:
         model = StepGuide
-        fields = [
-            "id",
-            "clip",
-            "step_number",
-            "timestamp_seconds",
-            "title",
-            "description_markdown",
-            "snapshot_image_url",
-            "created_at",
-        ]
+        fields = "__all__"
         read_only_fields = ["id", "created_at"]
 
 
 class TheaterClipSerializer(ClipSerializer):
-    """A clip as it plays inside the Playlist Theater: everything `ClipSerializer`
-    already exposes (assets, filter_settings) plus its non-destructive edit
-    tracks and step guides, so the theater view can hydrate playback and the
-    documentation deck from one nested payload instead of N follow-up
-    requests per clip."""
+    """A clip as it plays inside the Playlist Theater: `ClipSerializer`'s
+    fields plus its edit tracks and step guides in one nested payload."""
 
     tracks = TimelineTrackSerializer(many=True, read_only=True)
     step_guides = StepGuideSerializer(many=True, read_only=True)
@@ -136,16 +124,12 @@ class PlaylistTheaterItemSerializer(serializers.ModelSerializer):
 
 
 class PlaylistTheaterSerializer(serializers.ModelSerializer):
-    """Full runbook payload for `GET /playlists/<id>/theater/` — the ordered
-    clip queue with each clip's complete studio edit layers already attached.
-    """
+    """Full runbook payload for `GET /playlists/<id>/theater/`: the ordered
+    clip queue with each clip's complete studio edit layers attached."""
 
     items = PlaylistTheaterItemSerializer(many=True, read_only=True)
     owner_name = serializers.CharField(source="owner.full_name", read_only=True)
-    # The Playlist model has no department/team of its own (only an
-    # organization + owner) — the spec's "Department/Team" header badges are
-    # derived from whichever team the owner belongs to, the same lookup
-    # `OrgMemberSerializer.get_team`/`get_department` already uses elsewhere.
+
     owner_department = serializers.SerializerMethodField()
     owner_team = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
@@ -194,7 +178,7 @@ class PlaylistTheaterSerializer(serializers.ModelSerializer):
 class PageClipItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PageClipItem
-        fields = ["id", "page", "clip", "step_number", "step_note"]
+        fields = "__all__"
         read_only_fields = ["id"]
 
 

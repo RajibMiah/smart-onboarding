@@ -1,7 +1,11 @@
-"""Cookie-transported JWT authentication, for a Next.js frontend on another origin.
+"""
+File Introduction:
+Module: core.authentication
+Role: Cookie-transported JWT authentication for the browser-facing frontend.
 
-Falls back to the standard `Authorization: Bearer <token>` header so the same
-API also works from non-browser clients (mobile, curl, server-to-server).
+Responsibilities:
+- Authenticates requests carrying the JWT in an HttpOnly cookie.
+- Falls back to the standard Authorization header for non-browser clients.
 """
 
 from django.conf import settings
