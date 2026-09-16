@@ -1,4 +1,13 @@
-"""Core project & recorded media domain: maps to APC_CLIPS and APC_CLIP_ASSETS."""
+"""
+File Introduction:
+Module: media.models
+Role: Core project & recorded media domain — clips and their stored assets.
+
+Responsibilities:
+- Models a recorded/edited video project (Clip) and its visibility/status lifecycle.
+- Models a stored file (MediaAsset) — raw recording, transcoded output, thumbnail,
+  caption track, or overlay graphic — optionally linked to a Clip.
+"""
 
 import uuid
 
@@ -9,7 +18,6 @@ from core.models import Organization, TimeStampedModel
 
 
 def default_filter_settings() -> dict:
-    """Neutral (no-op) non-destructive filter values — matches the Studio's own defaults."""
     return {
         "brightness": 100,
         "contrast": 100,
@@ -56,10 +64,7 @@ class Clip(TimeStampedModel):
     thumbnail_url = models.URLField(blank=True, help_text="External thumbnail URL, used when no file is uploaded.")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     visibility = models.CharField(max_length=20, choices=Visibility.choices, default=Visibility.DRAFT)
-    # Non-destructive studio adjustments applied live on playback (CSS filter
-    # for brightness/contrast/saturation; volumeGain/noiseSuppression are
-    # metadata today, no live audio DSP yet) — camelCase keys so the frontend
-    # round-trips this dict with zero translation.
+
     filter_settings = models.JSONField(default=default_filter_settings, blank=True)
 
     objects = ClipQuerySet.as_manager()
@@ -81,11 +86,10 @@ class Clip(TimeStampedModel):
 
 
 class MediaAsset(TimeStampedModel):
-    """A stored file for a workspace: a raw recording/upload, transcoded output,
-    thumbnail, caption track, or overlay graphic. `clip` is optional — an asset
-    uploaded into the Studio's media bin exists at the workspace level first
-    and is only linked to a `Clip` once (if ever) it's saved as part of one.
-    """
+    """A stored file for a workspace: a raw recording/upload, transcoded
+    output, thumbnail, caption track, or overlay graphic. `clip` is
+    optional, since a media-bin upload isn't linked to one until saved
+    as part of a clip."""
 
     class AssetType(models.TextChoices):
         VIDEO = "video", "Video"

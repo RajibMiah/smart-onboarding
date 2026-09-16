@@ -1,3 +1,14 @@
+"""
+File Introduction:
+Module: core.serializers
+Role: Schema validation and payload formatting for identity/organization resources.
+
+Responsibilities:
+- Validates and shapes Organization, Department, Team, CustomRole, and User payloads.
+- Formats membership/role display data and JWT claim payloads for the frontend.
+- Handles registration and workspace-invitation acceptance payload validation.
+"""
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.utils.text import slugify
@@ -157,9 +168,7 @@ class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(read_only=True)
     avatar_url = serializers.SerializerMethodField()
     workspace = serializers.SerializerMethodField()
-    # Self-service team switching — write-only, resolved to a TeamMembership
-    # swap in UserSerializer.update() below. Department isn't independently
-    # settable: it's always derived from whichever team the user is on.
+
     team_id = serializers.PrimaryKeyRelatedField(
         source="team", queryset=Team.objects.all(), required=False, allow_null=True, write_only=True
     )

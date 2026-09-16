@@ -1,8 +1,12 @@
-"""Multi-track editor domain: timeline tracks and their timed overlay regions.
+"""
+File Introduction:
+Module: studio.models
+Role: Multi-track editor domain — timeline tracks and their timed overlay regions.
 
-Normalizes the ER diagram's JSON overlay columns (APC_CLIP_METADATA's
-video_track_config/blur_masks/text_overlays, APC_CLIP_SEGMENTS' timeline
-window) into first-class, independently queryable and orderable tables.
+Responsibilities:
+- Represents a clip's timeline as ordered tracks (video/audio/zoom/blur/text/cut).
+- Models each region type (zoom, blur, text overlay, cut, transcript segment) as an
+  independently queryable, orderable row anchored to a track.
 """
 
 import uuid
@@ -88,14 +92,9 @@ class BlurRegion(TimedRegion):
 
 
 class Cut(TimedRegion):
-    """A non-destructive timeline decision over a source-media range.
-
-    `KEEP` segments play at normal speed and need no explicit row (the
-    absence of a cut over a range means "keep"); `CUT` removes the range
-    entirely from playback; `SILENCE_SPEEDUP` keeps it but plays it back at
-    `speed_multiplier`x, typically a range `detect-silence` flagged as dead
-    air rather than something the editor removed outright.
-    """
+    """A non-destructive timeline decision over a source-media range: KEEP
+    (implicit, no row), CUT (removed from playback), or SILENCE_SPEEDUP
+    (kept, played back at `speed_multiplier`x)."""
 
     class CutType(models.TextChoices):
         KEEP = "keep", "Keep"
@@ -135,12 +134,8 @@ class TextOverlay(TimedRegion):
 
 class TranscriptSegment(TimedRegion):
     """One AI Auto-Edit voiceover script line, anchored to an `audio`-type
-    track. `original_text` is what transcription produced verbatim;
-    `script_text` is the same span after script generation (cleaned up,
-    formalized, or synthesized from the user's context/dictionary depending
-    on the job's `voiceover_mode`) — kept separate so the Studio's transcript
-    panel can show what changed, not just the final result.
-    """
+    track. `original_text` is the verbatim transcription; `script_text` is
+    the same span after refinement."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     track = models.ForeignKey(TimelineTrack, on_delete=models.CASCADE, related_name="transcript_segments")

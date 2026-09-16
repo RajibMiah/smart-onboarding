@@ -1,3 +1,13 @@
+"""
+File Introduction:
+Module: studio.serializers
+Role: Schema validation and payload formatting for timeline tracks and their timed regions.
+
+Responsibilities:
+- Validates and shapes zoom/blur/text/cut/transcript region payloads.
+- Validates the Auto-Edit request payload consumed by the Celery pipeline.
+"""
+
 from rest_framework import serializers
 
 from .models import BlurRegion, Cut, TextOverlay, TimelineTrack, TranscriptSegment, ZoomRegion
@@ -17,39 +27,28 @@ class TimedRegionSerializer(serializers.ModelSerializer):
 class ZoomRegionSerializer(TimedRegionSerializer):
     class Meta:
         model = ZoomRegion
-        fields = ["id", "track", "x", "y", "width", "height", "scale_factor", "start_time", "end_time"]
+        fields = "__all__"
         read_only_fields = ["id"]
 
 
 class BlurRegionSerializer(TimedRegionSerializer):
     class Meta:
         model = BlurRegion
-        fields = ["id", "track", "x", "y", "width", "height", "shape", "blur_radius", "start_time", "end_time"]
+        fields = "__all__"
         read_only_fields = ["id"]
 
 
 class TextOverlaySerializer(TimedRegionSerializer):
     class Meta:
         model = TextOverlay
-        fields = [
-            "id",
-            "track",
-            "content",
-            "position_x",
-            "position_y",
-            "font_size",
-            "color",
-            "background_color",
-            "start_time",
-            "end_time",
-        ]
+        fields = "__all__"
         read_only_fields = ["id"]
 
 
 class CutSerializer(TimedRegionSerializer):
     class Meta:
         model = Cut
-        fields = ["id", "track", "cut_type", "speed_multiplier", "start_time", "end_time"]
+        fields = "__all__"
         read_only_fields = ["id"]
 
     def validate(self, attrs: dict) -> dict:
@@ -64,15 +63,13 @@ class CutSerializer(TimedRegionSerializer):
 class TranscriptSegmentSerializer(TimedRegionSerializer):
     class Meta:
         model = TranscriptSegment
-        fields = ["id", "track", "original_text", "script_text", "start_time", "end_time"]
+        fields = "__all__"
         read_only_fields = ["id"]
 
 
 class AutoEditRequestSerializer(serializers.Serializer):
     """Validates the options payload for `POST /clips/<id>/auto-edit/` —
-    not a `ModelSerializer`: these are Celery task parameters, not fields on
-    a row of their own (see studio/tasks.py's `AI_AUTO_EDIT_USE_MOCK` note
-    for why nothing here persists as a "job" model)."""
+    Celery task parameters, not fields on a persisted model."""
 
     voiceover_mode = serializers.ChoiceField(choices=["auto_generate", "ai_voice_clone", "keep_original"])
     additional_context = serializers.CharField(required=False, allow_blank=True, default="")
@@ -99,16 +96,5 @@ class TimelineTrackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimelineTrack
-        fields = [
-            "id",
-            "clip",
-            "track_type",
-            "order",
-            "zoom_regions",
-            "blur_regions",
-            "text_overlays",
-            "cuts",
-            "transcript_segments",
-            "created_at",
-        ]
+        fields = "__all__"
         read_only_fields = ["id", "created_at"]

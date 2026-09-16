@@ -1,4 +1,14 @@
-"""Playlists, documentation pages and step guides: APC_PLAYLISTS/APC_PAGES domain."""
+"""
+File Introduction:
+Module: collaboration.models
+Role: Playlists, documentation pages, and step guides domain.
+
+Responsibilities:
+- Models playlists as ordered collections of clips (Playlist, PlaylistItem).
+- Models documentation pages as ordered collections of clips with step notes
+  (DocumentationPage, PageClipItem).
+- Models numbered how-to steps anchored to a clip's timestamps (StepGuide).
+"""
 
 import uuid
 
