@@ -89,15 +89,7 @@ class TheaterClipSerializer(ClipSerializer):
     author_team = serializers.SerializerMethodField()
 
     class Meta(ClipSerializer.Meta):
-        fields = [
-            *ClipSerializer.Meta.fields,
-            "tracks",
-            "step_guides",
-            "author_name",
-            "author_avatar_url",
-            "author_department",
-            "author_team",
-        ]
+        fields = "__all__"
 
     def get_author_avatar_url(self, obj) -> str:
         author = obj.author
