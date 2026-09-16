@@ -66,27 +66,7 @@ class ClipSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Clip
-        fields = [
-            "id",
-            "organization",
-            "author",
-            "title",
-            "slug",
-            "description",
-            "language",
-            "duration_seconds",
-            "thumbnail",
-            "thumbnail_url",
-            "status",
-            "visibility",
-            "filter_settings",
-            "assets",
-            "can_edit",
-            "is_owner",
-            "playlist_count",
-            "created_at",
-            "updated_at",
-        ]
+        fields = "__all__"
         read_only_fields = ["id", "organization", "author", "created_at", "updated_at"]
 
     def get_thumbnail_url(self, obj: Clip) -> str:

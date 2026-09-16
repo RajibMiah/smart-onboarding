@@ -30,32 +30,7 @@ class MediaShareRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MediaShareRequest
-        fields = [
-            "id",
-            "organization",
-            "created_by",
-            "created_by_name",
-            "content_type",
-            "object_id",
-            "content_title",
-            "content_thumbnail_url",
-            "target_user",
-            "target_user_name",
-            "target_team",
-            "target_team_name",
-            "target_department",
-            "target_department_name",
-            "request_type",
-            "priority",
-            "status",
-            "message",
-            "due_date",
-            "resolved_by",
-            "resolution_note",
-            "resolved_at",
-            "created_at",
-            "updated_at",
-        ]
+        fields = "__all__"
         read_only_fields = [
             "id",
             "organization",
