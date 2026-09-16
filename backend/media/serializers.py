@@ -1,3 +1,13 @@
+"""
+File Introduction:
+Module: media.serializers
+Role: Schema validation and payload formatting for clips and media assets.
+
+Responsibilities:
+- Validates and shapes Clip and MediaAsset payloads, including slug and filter_settings validation.
+- Formats read-only URL, ownership, and playlist-count fields for the frontend.
+"""
+
 from rest_framework import serializers
 
 from core.permissions import user_can_edit_object, user_is_owner_or_admin
@@ -6,9 +16,8 @@ from .models import Clip, MediaAsset
 
 
 class MediaAssetSerializer(serializers.ModelSerializer):
-    """`file` (write-only, multipart) is the real upload; `file_url` is always
-    the resolved, absolute location to play it back from — whether that came
-    from an uploaded file or an external URL."""
+    """`file` is the write-only upload; `file_url` resolves to the absolute
+    playback location, whether uploaded or an external URL."""
 
     file = serializers.FileField(write_only=True, required=False)
     file_url = serializers.SerializerMethodField()
@@ -46,15 +55,6 @@ class MediaAssetSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This clip doesn't belong to your workspace.")
         return value
 
-    def create(self, validated_data: dict) -> MediaAsset:
-        uploaded = validated_data.pop("file", None)
-        if uploaded is not None:
-            validated_data["file"] = uploaded
-            validated_data.setdefault("mime_type", uploaded.content_type or "")
-            validated_data.setdefault("file_size_bytes", uploaded.size)
-            validated_data.setdefault("status", MediaAsset.Status.READY)
-        return super().create(validated_data)
-
 
 class ClipSerializer(serializers.ModelSerializer):
     assets = MediaAssetSerializer(many=True, read_only=True)
@@ -66,27 +66,7 @@ class ClipSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Clip
-        fields = [
-            "id",
-            "organization",
-            "author",
-            "title",
-            "slug",
-            "description",
-            "language",
-            "duration_seconds",
-            "thumbnail",
-            "thumbnail_url",
-            "status",
-            "visibility",
-            "filter_settings",
-            "assets",
-            "can_edit",
-            "is_owner",
-            "playlist_count",
-            "created_at",
-            "updated_at",
-        ]
+        fields = "__all__"
         read_only_fields = ["id", "organization", "author", "created_at", "updated_at"]
 
     def get_thumbnail_url(self, obj: Clip) -> str:
@@ -96,26 +76,20 @@ class ClipSerializer(serializers.ModelSerializer):
         return obj.thumbnail_url
 
     def get_can_edit(self, obj: Clip) -> bool:
-        """May edit this clip's content (cuts, filters, metadata) — the
-        broader of the two flags; doesn't by itself permit deleting the clip
-        or changing its visibility, see `is_owner`."""
+        """May edit this clip's content (cuts, filters, metadata)."""
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return False
         return user_can_edit_object(request.user, obj, owner_field="author", content_type="clip")
 
     def get_is_owner(self, obj: Clip) -> bool:
-        """The narrower flag: this clip's own creator or a global admin —
-        gates changing visibility and deleting, regardless of any delegated
-        `can_edit` grant."""
+        """This clip's own creator or a global admin — gates delete/visibility changes."""
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return False
         return user_is_owner_or_admin(request.user, obj, owner_field="author")
 
     def get_playlist_count(self, obj: Clip) -> int:
-        # Informs the delete confirmation modal ("this clip is present in N
-        # playlists, it will be unlinked") without a separate round trip.
         return obj.playlist_items.values("playlist_id").distinct().count()
 
     def validate_slug(self, value: str) -> str:

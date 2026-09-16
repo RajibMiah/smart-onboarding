@@ -1,3 +1,14 @@
+"""
+File Introduction:
+Module: core.views
+Role: HTTP entry points for authentication, workspace administration, and membership management.
+
+Responsibilities:
+- Exposes registration, cookie-based JWT login/refresh/logout, and profile endpoints.
+- Manages organizations, departments, teams, custom roles, and workspace invitations.
+- Handles member role assignment and access revocation/reactivation.
+"""
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import connection
@@ -143,9 +154,6 @@ class LogoutView(APIView):
 
     def post(self, request, *args, **kwargs):
         if request.data.get("all_devices"):
-            # Every refresh token ever issued to this user, not just the
-            # current session's — same blacklist-every-OutstandingToken
-            # approach as OrgUserViewSet.revoke.
             for outstanding in OutstandingToken.objects.filter(user=request.user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
         else:
@@ -171,9 +179,7 @@ class MeView(generics.RetrieveUpdateAPIView):
 
 
 class MeAvatarUploadView(generics.GenericAPIView):
-    """POST /auth/me/avatar/ — multipart image upload, kept off MeView's own
-    PATCH (JSON) so that endpoint doesn't need multipart parsing for every
-    plain profile-field update."""
+    """POST /auth/me/avatar/ — multipart image upload, kept off MeView's own PATCH."""
 
     serializer_class = AvatarUploadSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -193,9 +199,7 @@ class MeAvatarUploadView(generics.GenericAPIView):
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):
-    """An organization is provisioned at registration; only Owner/Global
-    Admin/HR Manager may edit it afterward (workspace branding/retention
-    settings) — everyone else in the workspace can still read it."""
+    """Provisioned at registration; only Owner/Global Admin/HR Manager may edit it afterward."""
 
     serializer_class = OrganizationSerializer
     permission_classes = [IsWorkspaceMember]
@@ -215,9 +219,8 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="transfer-ownership")
     def transfer_ownership(self, request, pk=None):
-        """Owner-only: hands the Organization.owner FK to another member of
-        the same workspace, demoting the current owner to Global Admin
-        (never leaving the workspace ownerless) and promoting the target."""
+        """Owner-only: hands ownership to another member, demoting the
+        current owner to Global Admin and promoting the target."""
         organization = self.get_object()
         actor_membership = getattr(request.user, "membership", None)
         if not (actor_membership and organization.owner_id == request.user.id):
@@ -243,9 +246,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         return Response(OrganizationSerializer(organization, context={"request": request}).data)
 
     def perform_destroy(self, instance):
-        # Owner-only, deliberately stricter than perform_update's Global
-        # Admin/HR Manager gate — deleting the entire tenant (every clip,
-        # playlist, user) is categorically more severe than editing settings.
         membership = getattr(self.request.user, "membership", None)
         if not (membership and instance.owner_id == self.request.user.id):
             raise PermissionDenied("Only the workspace owner can delete the workspace.")
@@ -286,13 +286,7 @@ def _can_manage_member(actor: User, *, capability: str) -> bool:
 
 
 class OrgUserViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only "Manage Users" listing: every member of the caller's organization.
-
-    Plus two write actions (role assignment, revoke/reactivate) — kept on this
-    same User-keyed viewset rather than inventing a separate "members"
-    resource, since the frontend already only ever has a user id in hand here
-    (there's no membership id exposed anywhere).
-    """
+    """Read-only "Manage Users" listing, plus role assignment and revoke/reactivate actions."""
 
     serializer_class = OrgMemberSerializer
     permission_classes = [IsWorkspaceMember]
@@ -317,10 +311,6 @@ class OrgUserViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = MemberRoleUpdateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        # Only an existing global admin/owner may hand out (or take away)
-        # global-admin-equivalent tiers — otherwise an HR Manager granted
-        # can_assign_roles could promote themselves or anyone else straight
-        # to full admin.
         new_tier = serializer.validated_data.get("role_tier")
         actor_membership = request.user.membership
         if new_tier in (SystemRoleTier.OWNER, SystemRoleTier.GLOBAL_ADMIN) and not actor_membership.is_global_admin:
@@ -363,12 +353,9 @@ class OrgUserViewSet(viewsets.ReadOnlyModelViewSet):
         membership.revoked_by = request.user
         membership.save(update_fields=["is_authorized", "revoked_at", "revoked_by", "updated_at"])
 
-        # Blacklists every refresh token already issued to this user, so
-        # none of them can mint a new access token once the current one
-        # expires. The `IsWorkspaceMember.is_authorized` check is what makes
-        # this take effect immediately, on the very next request — token
-        # blacklisting alone wouldn't invalidate an access token that's
-        # already been issued and hasn't expired yet.
+        # Blacklisting alone doesn't invalidate an already-issued, unexpired
+        # access token — IsWorkspaceMember's is_authorized check is what
+        # makes revocation take effect immediately.
         for outstanding in OutstandingToken.objects.filter(user=target):
             BlacklistedToken.objects.get_or_create(token=outstanding)
 
@@ -392,13 +379,8 @@ class OrgUserViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class CustomRoleViewSet(viewsets.ModelViewSet):
-    """Admin-defined job roles with granular capability flags.
-
-    Defining a brand-new role template is scoped to Global Admins/Owners
-    only (`is_global_admin`) — a much more sensitive operation than
-    *assigning* an existing one, which `OrgUserViewSet.role` above allows for
-    anyone holding `can_assign_roles` (including an HR Manager).
-    """
+    """Admin-defined job roles with granular capability flags. Creating a
+    role is Global Admin/Owner-only; assigning one only needs can_assign_roles."""
 
     serializer_class = CustomRoleSerializer
     permission_classes = [IsWorkspaceMember, HasRolePermission]
@@ -408,9 +390,6 @@ class CustomRoleViewSet(viewsets.ModelViewSet):
         return CustomRole.objects.filter(organization_id=self.request.user.organization_id).select_related("department")
 
     def get_permissions(self):
-        # Reading the role list only requires being in the workspace (e.g.
-        # to populate a role-assignment dropdown) — only mutating requires
-        # is_global_admin.
         if self.request.method in permissions.SAFE_METHODS:
             return [IsWorkspaceMember()]
         return super().get_permissions()
@@ -435,11 +414,7 @@ def _send_invitation_email(invitation: WorkspaceInvitation) -> None:
 
 
 class WorkspaceInvitationViewSet(viewsets.ModelViewSet):
-    """Admin/creator-only: send, list, and revoke email invitations to join the workspace.
-
-    `verify` and `accept` are public sub-routes (`/invitations/verify/`,
-    `/invitations/accept/`) used by the unauthenticated accept-invite page.
-    """
+    """Admin/creator-only invitation management, plus public verify/accept sub-routes."""
 
     serializer_class = WorkspaceInvitationSerializer
     permission_classes = [IsWorkspaceMember, HasRolePermission]

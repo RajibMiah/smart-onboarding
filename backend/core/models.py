@@ -1,9 +1,12 @@
-"""Identity & organization domain: users, workspaces, departments, teams.
+"""
+File Introduction:
+Module: core.models
+Role: Identity and organization domain — users, workspaces, departments, teams, roles, and invitations.
 
-Maps to APC_ORGANIZATIONS, APC_USERS, APC_DEPARTMENTS, APC_TEAMS and
-APC_TEAM_MEMBERS in the ER diagram. Role flags (Creator / Content Manager /
-Global Admin) live on WorkspaceMembership rather than on the ERD's plain
-`is_staff` column, since permission checks need three independent flags.
+Responsibilities:
+- Defines the tenant boundary (Organization) that clips, playlists, and pages are scoped to.
+- Models per-organization role and capability flags (WorkspaceMembership, CustomRole, SystemRoleTier).
+- Represents the team/department hierarchy and the email-based workspace invitation lifecycle.
 """
 
 import secrets
@@ -27,7 +30,7 @@ class TimeStampedModel(models.Model):
 
 def default_workspace_settings() -> dict:
     return {
-        "retention_days": None,  # None = keep indefinitely
+        "retention_days": None,
         "default_clip_visibility": "draft",
         "force_strict_theme": True,
         "accent_color": "#FFD200",
@@ -55,9 +58,6 @@ class Organization(TimeStampedModel):
         blank=True,
         related_name="owned_organizations",
     )
-    # Branding/retention/default-visibility preferences — grouped as one JSON
-    # blob (same pattern as Clip.filter_settings) rather than several columns
-    # for what's fundamentally one cohesive "workspace preferences" concept.
     settings = models.JSONField(default=default_workspace_settings, blank=True)
 
     class Meta:
@@ -108,8 +108,6 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=80, blank=True)
     last_name = models.CharField(max_length=80, blank=True)
-    # `avatar` (an uploaded file) takes priority over `avatar_url` (an
-    # external URL) — same fallback pattern as Clip.thumbnail/thumbnail_url.
     avatar = models.ImageField(upload_to="avatars/%Y/%m/%d/", blank=True, null=True)
     avatar_url = models.URLField(blank=True)
     location = models.CharField(max_length=150, blank=True)
@@ -136,14 +134,10 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
 
 class SystemRoleTier(models.TextChoices):
-    """A richer role label layered on top of the existing is_creator/is_global_admin/
-    is_content_manager flags — additive, not a replacement. Those three booleans stay
-    the source of truth for every existing permission check in this codebase (they're
-    baked into HasRolePermission usages, the JWT claims, and the invitation flow); this
-    enum only classifies roles that don't fit them, namely HR_MANAGER and CUSTOM.
-    OWNER/GLOBAL_ADMIN/CREATOR/VIEWER here are informational — assigning HR_MANAGER or
-    CUSTOM deliberately does NOT touch is_global_admin, which is exactly what keeps an
-    HR Manager or a custom role out of admin-gated endpoints without extra plumbing.
+    """Additive role classification layered on top of the existing
+    is_creator/is_global_admin/is_content_manager flags, which remain the
+    source of truth for every permission check. Assigning HR_MANAGER or
+    CUSTOM does not itself grant is_global_admin.
     """
 
     OWNER = "owner", "Workspace Owner"
@@ -156,17 +150,10 @@ class SystemRoleTier(models.TextChoices):
     CUSTOM = "custom", "Custom Defined Role"
 
 
-# The HR Manager tier's fixed capability set (see SystemRoleTier's docstring —
-# this tier is informational/additive, so its allowed flags are hardcoded here
-# rather than modeled as a CustomRole row).
 HR_MANAGER_CAPABILITIES = frozenset(
     {"can_invite_users", "can_manage_teams", "can_manage_departments", "can_view_analytics", "can_revoke_access"}
 )
 
-# One human-readable scope sentence per tier, for the "My Account" role
-# banner ("[Role Name] - [scope]"). Kept here (not hardcoded in the
-# frontend) so it stays in sync with whatever HR_MANAGER_CAPABILITIES etc.
-# actually grant.
 ROLE_SCOPE_DESCRIPTIONS: dict[str, str] = {
     SystemRoleTier.OWNER: "you have full control over the workspace, billing, and content",
     SystemRoleTier.GLOBAL_ADMIN: "you can manage every user, role, and setting in this workspace",
@@ -187,8 +174,6 @@ class CustomRole(TimeStampedModel):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
-    # Optional: this role's authority only applies within one department.
-    # String reference: Department is defined later in this file.
     department = models.ForeignKey(
         "core.Department", on_delete=models.SET_NULL, null=True, blank=True, related_name="scoped_custom_roles"
     )
@@ -235,16 +220,11 @@ class WorkspaceMembership(TimeStampedModel):
     is_content_manager = models.BooleanField(default=False)
     tags = models.JSONField(default=list, blank=True, help_text="Free-form organizational tags, e.g. 'Engineering'.")
 
-    # Richer role classification, additive on top of the booleans above (see
-    # SystemRoleTier's docstring).
     role_tier = models.CharField(max_length=30, choices=SystemRoleTier.choices, default=SystemRoleTier.CREATOR)
     custom_role = models.ForeignKey(
         CustomRole, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_members"
     )
 
-    # Revocation — reuses `is_authorized` as the single active/suspended flag
-    # (it already existed with exactly this intent) rather than adding a
-    # second, potentially-conflicting status field.
     revoked_at = models.DateTimeField(null=True, blank=True)
     revoked_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="revoked_memberships"
@@ -348,12 +328,10 @@ class WorkspaceInvitation(TimeStampedModel):
     email = models.EmailField(db_index=True)
     token = models.CharField(max_length=128, unique=True, default=generate_invitation_token, editable=False)
 
-    # Organizational assignment, applied to the WorkspaceMembership/TeamMembership on accept.
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.SET_NULL, null=True, blank=True)
     tags = models.JSONField(default=list, blank=True)
 
-    # Permission flags, copied onto the new WorkspaceMembership on accept.
     is_authorized = models.BooleanField(default=True)
     is_creator = models.BooleanField(default=True)
     is_global_admin = models.BooleanField(default=False)
