@@ -1,3 +1,12 @@
+"""
+File Introduction:
+Module: core.urls
+Role: URL routing for authentication and account-management endpoints.
+
+Responsibilities:
+- Maps the auth/register/login/refresh/logout/me routes to their views.
+"""
+
 from django.urls import path
 
 from .views import (
