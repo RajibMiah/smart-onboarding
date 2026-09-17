@@ -8,8 +8,11 @@ Responsibilities:
 - Formats read-only URL, ownership, and playlist-count fields for the frontend.
 """
 
+from urllib.parse import urlencode
+
 from rest_framework import serializers
 
+from core.media_tokens import generate_media_token
 from core.permissions import user_can_edit_object, user_is_owner_or_admin
 
 from .models import Clip, MediaAsset
@@ -47,7 +50,11 @@ class MediaAssetSerializer(serializers.ModelSerializer):
     def get_file_url(self, obj: MediaAsset) -> str:
         if obj.file:
             request = self.context.get("request")
-            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+            url = request.build_absolute_uri(obj.file.url) if request else obj.file.url
+            if request and request.user.is_authenticated:
+                token = generate_media_token(request.user.id)
+                url = f"{url}?{urlencode({'token': token})}"
+            return url
         return obj.file_url
 
     def validate_clip(self, value: Clip | None) -> Clip | None:

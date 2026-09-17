@@ -13,7 +13,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.utils.text import slugify
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import (
     ROLE_SCOPE_DESCRIPTIONS,
@@ -368,16 +367,3 @@ class AcceptInvitationSerializer(serializers.Serializer):
         return user
 
 
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Adds organization/role claims to the access token for cheap frontend gating."""
-
-    @classmethod
-    def get_token(cls, user):
-        token = super().get_token(user)
-        token["organization_id"] = str(user.organization_id) if user.organization_id else None
-        membership = getattr(user, "membership", None)
-        token["is_creator"] = bool(membership and membership.is_creator)
-        token["is_global_admin"] = bool(membership and membership.is_global_admin)
-        token["is_content_manager"] = bool(membership and membership.is_content_manager)
-        token["role_tier"] = membership.role_tier if membership else None
-        return token

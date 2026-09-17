@@ -65,8 +65,9 @@ const AcceptInviteContent = () => {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      // The accept endpoint sets the same HttpOnly auth cookies /auth/login/ does,
-      // so there's nothing further to do here besides land on the dashboard.
+      // The accept endpoint returns the same access/refresh token pair /auth/login/
+      // does; invitationsApi.accept() stores them, so there's nothing further to do
+      // here besides land on the dashboard.
       await invitationsApi.accept({ token, first_name: firstName, last_name: lastName, password });
       router.push("/");
     } catch (error) {

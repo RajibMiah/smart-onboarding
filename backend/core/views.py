@@ -4,7 +4,7 @@ Module: core.views
 Role: HTTP entry points for authentication, workspace administration, and membership management.
 
 Responsibilities:
-- Exposes registration, cookie-based JWT login/refresh/logout, and profile endpoints.
+- Exposes registration, header-based JWT login/refresh/logout, and profile endpoints.
 - Manages organizations, departments, teams, custom roles, and workspace invitations.
 - Handles member role assignment and access revocation/reactivation.
 """
@@ -30,7 +30,6 @@ from .serializers import (
     AcceptInvitationSerializer,
     AvatarUploadSerializer,
     CustomRoleSerializer,
-    CustomTokenObtainPairSerializer,
     DepartmentSerializer,
     MemberRoleUpdateSerializer,
     OrganizationSerializer,
@@ -41,8 +40,6 @@ from .serializers import (
     VerifyInvitationSerializer,
     WorkspaceInvitationSerializer,
 )
-
-REFRESH_COOKIE_PATH = "/api/v1/auth/refresh/"
 
 
 @api_view(["GET"])
@@ -72,32 +69,6 @@ def health_check(request):
     return Response(payload, status=200 if db_status == "ok" else 503)
 
 
-def _set_auth_cookies(response: Response, access: str | None, refresh: str | None = None) -> None:
-    if access is not None:
-        response.set_cookie(
-            settings.JWT_AUTH_COOKIE,
-            access,
-            httponly=True,
-            secure=settings.JWT_COOKIE_SECURE,
-            samesite=settings.JWT_COOKIE_SAMESITE,
-            path="/",
-        )
-    if refresh is not None:
-        response.set_cookie(
-            settings.JWT_AUTH_REFRESH_COOKIE,
-            refresh,
-            httponly=True,
-            secure=settings.JWT_COOKIE_SECURE,
-            samesite=settings.JWT_COOKIE_SAMESITE,
-            path=REFRESH_COOKIE_PATH,
-        )
-
-
-def _clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie(settings.JWT_AUTH_COOKIE, path="/")
-    response.delete_cookie(settings.JWT_AUTH_REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
-
-
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -109,44 +80,16 @@ class RegisterView(generics.CreateAPIView):
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
-class CookieTokenObtainPairView(TokenObtainPairView):
-    """Logs in and sets the access/refresh tokens as HttpOnly cookies."""
-
-    serializer_class = CustomTokenObtainPairSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        if response.status_code != status.HTTP_200_OK:
-            return response
-
-        access = response.data.pop("access", None)
-        refresh = response.data.pop("refresh", None)
-        _set_auth_cookies(response, access, refresh)
-        response.data["detail"] = "Authenticated"
-        return response
-
-
-class CookieTokenRefreshView(TokenRefreshView):
-    """Rotates tokens using the refresh cookie instead of a request body field."""
+class LoginView(TokenObtainPairView):
+    """Returns the access/refresh token pair directly in the JSON body."""
 
     permission_classes = [permissions.AllowAny]
 
-    def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
-        if refresh_token is None:
-            return Response({"detail": "Refresh token missing."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        request.data["refresh"] = refresh_token
-        response = super().post(request, *args, **kwargs)
-        if response.status_code != status.HTTP_200_OK:
-            return response
+class RefreshView(TokenRefreshView):
+    """Rotates the token pair from a refresh token supplied in the request body."""
 
-        access = response.data.pop("access", None)
-        refresh = response.data.pop("refresh", None)
-        _set_auth_cookies(response, access, refresh)
-        response.data["detail"] = "Refreshed"
-        return response
+    permission_classes = [permissions.AllowAny]
 
 
 class LogoutView(APIView):
@@ -157,16 +100,14 @@ class LogoutView(APIView):
             for outstanding in OutstandingToken.objects.filter(user=request.user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
         else:
-            refresh_token = request.COOKIES.get(settings.JWT_AUTH_REFRESH_COOKIE)
+            refresh_token = request.data.get("refresh")
             if refresh_token:
                 try:
                     RefreshToken(refresh_token).blacklist()
                 except TokenError:
                     pass
 
-        response = Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
-        _clear_auth_cookies(response)
-        return response
+        return Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
 
 
 class MeView(generics.RetrieveUpdateAPIView):
@@ -458,7 +399,8 @@ class WorkspaceInvitationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        token_serializer = CustomTokenObtainPairSerializer.get_token(user)
-        response = Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
-        _set_auth_cookies(response, str(token_serializer.access_token), str(token_serializer))
-        return response
+        refresh = RefreshToken.for_user(user)
+        data = UserSerializer(user).data
+        data["access"] = str(refresh.access_token)
+        data["refresh"] = str(refresh)
+        return Response(data, status=status.HTTP_201_CREATED)

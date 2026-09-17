@@ -8,9 +8,9 @@ Responsibilities:
 - Is the ONLY access-control checkpoint for raw clip-asset bytes: `MediaAssetViewSet`/
   `ClipViewSet` gate the JSON metadata, but a `<video src>` hits this URL directly, so
   authentication and clip/playlist visibility are enforced here before any file is served.
-- Authenticates manually via `CookieJWTAuthentication`, since this route sits outside DRF
-  and Django's `AuthenticationMiddleware` doesn't populate `request.user` for the
-  JWT-in-cookie scheme this app uses.
+- Authenticates via a short-lived signed `?token=` query param (core.media_tokens),
+  since this route sits outside DRF and a `<video src>`/`<img src>` load can't carry
+  an Authorization header. The token is embedded in `file_url` by MediaAssetSerializer.
 """
 
 import mimetypes
@@ -19,21 +19,26 @@ from pathlib import Path
 from typing import BinaryIO
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.utils._os import safe_join
 from django.utils.http import http_date
+
+from core.media_tokens import verify_media_token
 
 _RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 
 
 def _authenticated_user(request: HttpRequest):
-    from core.authentication import CookieJWTAuthentication
-
-    try:
-        result = CookieJWTAuthentication().authenticate(request)
-    except Exception:
+    token = request.GET.get("token")
+    if not token:
         return None
-    return result[0] if result else None
+
+    user_id = verify_media_token(token)
+    if user_id is None:
+        return None
+
+    return get_user_model().objects.filter(id=user_id).select_related("membership").first()
 
 
 def _clip_is_streamable(user, clip) -> bool:

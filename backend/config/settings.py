@@ -184,7 +184,7 @@ REST_FRAMEWORK = {
         else ["rest_framework.renderers.JSONRenderer"]
     ),
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "core.authentication.CookieJWTAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -214,14 +214,11 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
 }
 
-# Cookie transport for JWTs, used by CookieJWTAuthentication and the
-# core.views login/refresh/logout endpoints. Keeps tokens out of client-side
-# JS (HttpOnly) while still working with the Next.js frontend on a
-# different origin during local development.
-JWT_AUTH_COOKIE = os.getenv("JWT_AUTH_COOKIE", "apc_access_token")
-JWT_AUTH_REFRESH_COOKIE = os.getenv("JWT_AUTH_REFRESH_COOKIE", "apc_refresh_token")
-JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "" if DEBUG else "True") == "True"
-JWT_COOKIE_SAMESITE = os.getenv("JWT_COOKIE_SAMESITE", "Lax")
+# Signed-token transport for direct media byte-range requests (see
+# core.media_tokens / media.range_serve): a <video>/<audio> tag can't send an
+# Authorization header, so the signed URL carries a short-lived, user-scoped
+# token instead. Generous enough to cover a full playback session.
+MEDIA_TOKEN_MAX_AGE_SECONDS = int(os.getenv("MEDIA_TOKEN_MAX_AGE_SECONDS", 4 * 60 * 60))
 
 
 # Email

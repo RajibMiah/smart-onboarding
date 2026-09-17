@@ -10,11 +10,11 @@ Responsibilities:
 from django.urls import path
 
 from .views import (
-    CookieTokenObtainPairView,
-    CookieTokenRefreshView,
+    LoginView,
     LogoutView,
     MeAvatarUploadView,
     MeView,
+    RefreshView,
     RegisterView,
     health_check,
 )
@@ -22,8 +22,8 @@ from .views import (
 urlpatterns = [
     path("health/", health_check, name="health-check"),
     path("register/", RegisterView.as_view(), name="auth-register"),
-    path("login/", CookieTokenObtainPairView.as_view(), name="auth-login"),
-    path("refresh/", CookieTokenRefreshView.as_view(), name="auth-refresh"),
+    path("login/", LoginView.as_view(), name="auth-login"),
+    path("refresh/", RefreshView.as_view(), name="auth-refresh"),
     path("logout/", LogoutView.as_view(), name="auth-logout"),
     path("me/", MeView.as_view(), name="auth-me"),
     path("me/avatar/", MeAvatarUploadView.as_view(), name="auth-me-avatar"),

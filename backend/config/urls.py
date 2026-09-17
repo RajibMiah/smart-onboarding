@@ -37,6 +37,6 @@ if settings.DEBUG:
     # already gathered them into STATIC_ROOT (done in docker-entrypoint.sh).
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     # Gives the DRF browsable API's "Log in" / "Log out" links somewhere to
-    # post to (SessionAuthentication needs this — CookieJWTAuthentication
-    # alone has no browsable-API login form).
+    # post to (SessionAuthentication needs this — JWTAuthentication alone
+    # has no browsable-API login form).
     urlpatterns += [path("api-auth/", include("rest_framework.urls"))]

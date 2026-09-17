@@ -1,12 +1,53 @@
 /**
- * Thin fetch wrapper for the Django REST backend. Every request sends
- * `credentials: "include"` so the HttpOnly JWT cookies (set by
- * /auth/login/ and /auth/refresh/) ride along automatically — callers never
- * touch a token directly. A single silent refresh-and-retry handles the
- * 15-minute access-token expiry without surfacing it to the UI.
+ * Thin fetch wrapper for the Django REST backend. The JWT access token is
+ * attached as `Authorization: Bearer <token>` on every request; login/refresh
+ * store the access+refresh pair in localStorage. A single silent
+ * refresh-and-retry handles the 15-minute access-token expiry without
+ * surfacing it to the UI.
  */
 
 const API_ROOT = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1`;
+
+const ACCESS_TOKEN_KEY = "apc_access_token";
+const REFRESH_TOKEN_KEY = "apc_refresh_token";
+
+function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setTokens(access?: string | null, refresh?: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (access) localStorage.setItem(ACCESS_TOKEN_KEY, access);
+    if (refresh) localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+  } catch {
+    // Storage unavailable (private browsing, quota) — session just won't persist across reloads.
+  }
+}
+
+function clearTokens(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  } catch {
+    // Nothing to clean up if storage isn't available.
+  }
+}
 
 export class ApiError extends Error {
   status: number;
@@ -46,8 +87,23 @@ const extractMessage = (body: unknown): { message: string; fieldErrors: Record<s
 let refreshInFlight: Promise<boolean> | null = null;
 
 async function refreshSession(): Promise<boolean> {
-  refreshInFlight ??= fetch(`${API_ROOT}/auth/refresh/`, { method: "POST", credentials: "include" })
-    .then((response) => response.ok)
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+
+  refreshInFlight ??= fetch(`${API_ROOT}/auth/refresh/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh: refreshToken }),
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        clearTokens();
+        return false;
+      }
+      const data = (await response.json()) as { access?: string; refresh?: string };
+      setTokens(data.access, data.refresh);
+      return true;
+    })
     .finally(() => {
       refreshInFlight = null;
     });
@@ -65,12 +121,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const { method = "GET", body, _retried = false } = options;
   const isFormData = body instanceof FormData;
 
+  const headers: Record<string, string> = {};
+  // FormData bodies must NOT get an explicit Content-Type — the browser
+  // sets one with the multipart boundary itself.
+  if (body !== undefined && !isFormData) headers["Content-Type"] = "application/json";
+  const accessToken = getAccessToken();
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
   const response = await fetch(`${API_ROOT}${path}`, {
     method,
-    credentials: "include",
-    // FormData bodies must NOT get an explicit Content-Type — the browser
-    // sets one with the multipart boundary itself.
-    headers: body !== undefined && !isFormData ? { "Content-Type": "application/json" } : undefined,
+    headers,
     body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   });
 
@@ -326,10 +386,22 @@ export interface RegisterPayload {
 
 export const authApi = {
   register: (payload: RegisterPayload) => request<ApiUser>("/auth/register/", { method: "POST", body: payload }),
-  login: (payload: { email: string; password: string }) =>
-    request<{ detail: string }>("/auth/login/", { method: "POST", body: payload }),
-  logout: (options?: { allDevices?: boolean }) =>
-    request<{ detail: string }>("/auth/logout/", { method: "POST", body: { all_devices: Boolean(options?.allDevices) } }),
+  login: async (payload: { email: string; password: string }) => {
+    const data = await request<{ access: string; refresh: string }>("/auth/login/", { method: "POST", body: payload });
+    setTokens(data.access, data.refresh);
+    return data;
+  },
+  logout: async (options?: { allDevices?: boolean }) => {
+    const refresh = getRefreshToken();
+    try {
+      return await request<{ detail: string }>("/auth/logout/", {
+        method: "POST",
+        body: { all_devices: Boolean(options?.allDevices), refresh },
+      });
+    } finally {
+      clearTokens();
+    }
+  },
   me: () => request<ApiUser>("/auth/me/"),
   updateMe: (
     payload: Partial<Pick<ApiUser, "first_name" | "last_name" | "location" | "language">> & { team_id?: string | null },
@@ -457,8 +529,14 @@ export const invitationsApi = {
     request<ApiWorkspaceInvitation>("/invitations/", { method: "POST", body: payload }),
   revoke: (id: string) => request<void>(`/invitations/${id}/`, { method: "DELETE" }),
   verify: (token: string) => request<InvitationVerification>(`/invitations/verify/?token=${encodeURIComponent(token)}`),
-  accept: (payload: AcceptInvitationPayload) =>
-    request<ApiUser>("/invitations/accept/", { method: "POST", body: payload }),
+  accept: async (payload: AcceptInvitationPayload) => {
+    const data = await request<ApiUser & { access: string; refresh: string }>("/invitations/accept/", {
+      method: "POST",
+      body: payload,
+    });
+    setTokens(data.access, data.refresh);
+    return data;
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -530,7 +608,8 @@ function uploadMediaAssetXhr(input: MediaAssetUploadInput): Promise<ApiMediaAsse
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_ROOT}/media-assets/`);
-    xhr.withCredentials = true;
+    const accessToken = getAccessToken();
+    if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) input.onProgress?.(Math.round((event.loaded / event.total) * 100));

@@ -144,7 +144,7 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
     try {
       await authApi.logout();
     } catch {
-      // Cookies are cleared server-side either way; proceed to redirect regardless.
+      // authApi.logout() clears local tokens even on failure; proceed to redirect regardless.
     }
     setApiUser(null);
     router.replace("/login");
