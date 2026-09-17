@@ -438,19 +438,33 @@ class Command(BaseCommand):
         per clip, matching the (clip, order) uniqueness this app enforces."""
         zoom_track = TimelineTrack.objects.create(clip=clip, track_type=TimelineTrack.TrackType.ZOOM, order=0)
         ZoomRegion.objects.create(
-            track=zoom_track, x=20.00, y=15.00, width=60.00, height=60.00, scale_factor=1.50, start_time=2.000, end_time=6.000
+            track=zoom_track,
+            position_x=20.00,
+            position_y=15.00,
+            width_pct=60.00,
+            height_pct=60.00,
+            scale_factor=1.50,
+            start_time=2.000,
+            end_time=6.000,
         )
         ZoomRegion.objects.create(
-            track=zoom_track, x=10.00, y=10.00, width=50.00, height=50.00, scale_factor=1.75, start_time=12.000, end_time=16.000
+            track=zoom_track,
+            position_x=10.00,
+            position_y=10.00,
+            width_pct=50.00,
+            height_pct=50.00,
+            scale_factor=1.75,
+            start_time=12.000,
+            end_time=16.000,
         )
 
         blur_track = TimelineTrack.objects.create(clip=clip, track_type=TimelineTrack.TrackType.BLUR, order=1)
         BlurRegion.objects.create(
             track=blur_track,
-            x=5.00,
-            y=5.00,
-            width=25.00,
-            height=15.00,
+            position_x=5.00,
+            position_y=5.00,
+            width_pct=25.00,
+            height_pct=15.00,
             shape=BlurRegion.Shape.RECTANGLE,
             blur_radius=16,
             start_time=0.500,

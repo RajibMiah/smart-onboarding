@@ -647,10 +647,10 @@ export type TrackType = "video" | "audio" | "zoom" | "blur" | "text" | "cut";
 export interface ApiZoomRegion {
   id: string;
   track: string;
-  x: string;
-  y: string;
-  width: string;
-  height: string;
+  position_x: string;
+  position_y: string;
+  width_pct: string;
+  height_pct: string;
   scale_factor: string;
   start_time: string;
   end_time: string;
@@ -659,10 +659,10 @@ export interface ApiZoomRegion {
 export interface ApiBlurRegion {
   id: string;
   track: string;
-  x: string;
-  y: string;
-  width: string;
-  height: string;
+  position_x: string;
+  position_y: string;
+  width_pct: string;
+  height_pct: string;
   shape: "rectangle" | "ellipse";
   blur_radius: number;
   start_time: string;

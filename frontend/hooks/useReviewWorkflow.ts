@@ -25,8 +25,8 @@ import type { DocumentationStep, ProcessingStatus } from "@/types/review";
 const PROCESSING_DURATION_MS = 3000;
 
 /**
- * Backend region fields are fixed-precision DecimalFields (x/y/width/height:
- * max_digits=5, decimal_places=2; scale_factor: max_digits=4, decimal_places=2;
+ * Backend region fields are fixed-precision DecimalFields (position_x/position_y/
+ * width_pct/height_pct: max_digits=5, decimal_places=2; scale_factor: max_digits=4, decimal_places=2;
  * start/end time: decimal_places=3) — `String(someFloat)` can produce far more
  * digits than that (e.g. "83.33333333333334" from a bounds ratio × 100),
  * which the API rejects with "Ensure that there are no more than N digits in
@@ -240,10 +240,10 @@ export const useReviewWorkflow = ({ initialTitle, hasMedia }: UseReviewWorkflowO
             state.zoomRegions.map((region) =>
               zoomRegionsApi.create({
                 track: trackId,
-                x: toDecimalString(region.bounds.x * 100, 2),
-                y: toDecimalString(region.bounds.y * 100, 2),
-                width: toDecimalString(region.bounds.width * 100, 2),
-                height: toDecimalString(region.bounds.height * 100, 2),
+                position_x: toDecimalString(region.bounds.x * 100, 2),
+                position_y: toDecimalString(region.bounds.y * 100, 2),
+                width_pct: toDecimalString(region.bounds.width * 100, 2),
+                height_pct: toDecimalString(region.bounds.height * 100, 2),
                 scale_factor: toDecimalString(region.scale, 2),
                 start_time: toDecimalString(region.startTime, 3),
                 end_time: toDecimalString(region.endTime, 3),
@@ -257,10 +257,10 @@ export const useReviewWorkflow = ({ initialTitle, hasMedia }: UseReviewWorkflowO
             state.blurRegions.map((region) =>
               blurRegionsApi.create({
                 track: trackId,
-                x: toDecimalString(region.bounds.x * 100, 2),
-                y: toDecimalString(region.bounds.y * 100, 2),
-                width: toDecimalString(region.bounds.width * 100, 2),
-                height: toDecimalString(region.bounds.height * 100, 2),
+                position_x: toDecimalString(region.bounds.x * 100, 2),
+                position_y: toDecimalString(region.bounds.y * 100, 2),
+                width_pct: toDecimalString(region.bounds.width * 100, 2),
+                height_pct: toDecimalString(region.bounds.height * 100, 2),
                 shape: region.shape,
                 blur_radius: region.blurRadius,
                 start_time: toDecimalString(region.startTime, 3),

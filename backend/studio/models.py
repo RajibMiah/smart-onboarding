@@ -11,9 +11,12 @@ Responsibilities:
 
 import uuid
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from media.models import Clip
+
+_PCT_VALIDATORS = [MinValueValidator(0), MaxValueValidator(100)]
 
 
 class TimelineTrack(models.Model):
@@ -55,10 +58,18 @@ class TimedRegion(models.Model):
 class ZoomRegion(TimedRegion):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     track = models.ForeignKey(TimelineTrack, on_delete=models.CASCADE, related_name="zoom_regions")
-    x = models.DecimalField(max_digits=5, decimal_places=2, help_text="Bounding box x, percent of frame width")
-    y = models.DecimalField(max_digits=5, decimal_places=2, help_text="Bounding box y, percent of frame height")
-    width = models.DecimalField(max_digits=5, decimal_places=2)
-    height = models.DecimalField(max_digits=5, decimal_places=2)
+    position_x = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box left edge, percent of frame width."
+    )
+    position_y = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box top edge, percent of frame height."
+    )
+    width_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box width, percent of frame width."
+    )
+    height_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box height, percent of frame height."
+    )
     scale_factor = models.DecimalField(max_digits=4, decimal_places=2, default=1.5)
 
     class Meta:
@@ -76,10 +87,18 @@ class BlurRegion(TimedRegion):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     track = models.ForeignKey(TimelineTrack, on_delete=models.CASCADE, related_name="blur_regions")
-    x = models.DecimalField(max_digits=5, decimal_places=2)
-    y = models.DecimalField(max_digits=5, decimal_places=2)
-    width = models.DecimalField(max_digits=5, decimal_places=2)
-    height = models.DecimalField(max_digits=5, decimal_places=2)
+    position_x = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box left edge, percent of frame width."
+    )
+    position_y = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box top edge, percent of frame height."
+    )
+    width_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box width, percent of frame width."
+    )
+    height_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, validators=_PCT_VALIDATORS, help_text="Bounding box height, percent of frame height."
+    )
     shape = models.CharField(max_length=20, choices=Shape.choices, default=Shape.RECTANGLE)
     blur_radius = models.PositiveSmallIntegerField(default=10)
 

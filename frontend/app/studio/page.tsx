@@ -122,10 +122,10 @@ const StudioPageContent = () => {
               endTime: Number(region.end_time),
               scale: Number(region.scale_factor),
               bounds: {
-                x: Number(region.x) / 100,
-                y: Number(region.y) / 100,
-                width: Number(region.width) / 100,
-                height: Number(region.height) / 100,
+                x: Number(region.position_x) / 100,
+                y: Number(region.position_y) / 100,
+                width: Number(region.width_pct) / 100,
+                height: Number(region.height_pct) / 100,
               },
             });
           }
@@ -139,10 +139,10 @@ const StudioPageContent = () => {
               blurRadius: region.blur_radius,
               feather: false,
               bounds: {
-                x: Number(region.x) / 100,
-                y: Number(region.y) / 100,
-                width: Number(region.width) / 100,
-                height: Number(region.height) / 100,
+                x: Number(region.position_x) / 100,
+                y: Number(region.position_y) / 100,
+                width: Number(region.width_pct) / 100,
+                height: Number(region.height_pct) / 100,
               },
             });
           }
