@@ -13,11 +13,11 @@ interface StorageQuotaIndicatorProps {
 
 const QUOTA_WARNING_THRESHOLD_PERCENT = 80;
 
-function formatBytesShort(bytes: number): string {
+const formatBytesShort = (bytes: number): string => {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
   if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
   return `${Math.round(bytes / 1024)} KB`;
-}
+};
 
 /** Compact editorial badge: local auto-save status, plus a disk-quota warning once usage runs high. */
 export function StorageQuotaIndicator({ saveStatus, quota, errorMessage }: StorageQuotaIndicatorProps) {

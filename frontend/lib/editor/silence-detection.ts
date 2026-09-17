@@ -25,7 +25,7 @@ export interface DetectSilenceOptions {
  * standard technique (the same basic approach tools like Descript's
  * "Remove filler words/silence" use under the hood).
  */
-export async function detectSilence(audioBlob: Blob, options: DetectSilenceOptions = {}): Promise<TimelineCut[]> {
+export const detectSilence = async (audioBlob: Blob, options: DetectSilenceOptions = {}): Promise<TimelineCut[]> => {
   const offset = options.timelineOffset ?? 0;
   const arrayBuffer = await audioBlob.arrayBuffer();
 
@@ -91,4 +91,4 @@ export async function detectSilence(audioBlob: Blob, options: DetectSilenceOptio
   } finally {
     await audioContext.close();
   }
-}
+};

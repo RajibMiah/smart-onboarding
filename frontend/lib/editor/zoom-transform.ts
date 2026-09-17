@@ -42,7 +42,7 @@ export const IDENTITY_ZOOM_TRANSFORM = "scale(1) translate(0%, 0%)";
  * relying on native controls on a video that can be zoomed (see
  * VideoPlaybackControls, rendered as a sibling outside this transform entirely).
  */
-export function computeZoomTransform(activeZoom: ZoomRegion | null): string {
+export const computeZoomTransform = (activeZoom: ZoomRegion | null): string => {
   if (!activeZoom) return IDENTITY_ZOOM_TRANSFORM;
   const { scale } = activeZoom;
   const centerX = activeZoom.bounds.x + activeZoom.bounds.width / 2;
@@ -53,8 +53,8 @@ export function computeZoomTransform(activeZoom: ZoomRegion | null): string {
   const shiftY = clampShift((0.5 - centerY) * 100, maxShiftPercent);
 
   return `scale(${scale}) translate(${shiftX}%, ${shiftY}%)`;
-}
+};
 
-function clampShift(value: number, maxAbs: number): number {
+const clampShift = (value: number, maxAbs: number): number => {
   return Math.max(-maxAbs, Math.min(maxAbs, value));
-}
+};

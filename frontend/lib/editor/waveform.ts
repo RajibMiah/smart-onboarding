@@ -4,7 +4,7 @@
  * job (see `useFFmpegWasm.extractAudio`) is only to strip the video track
  * first so decoding has less to chew through.
  */
-export async function computeWaveformPeaks(audioBlob: Blob, bucketCount = 200): Promise<number[]> {
+export const computeWaveformPeaks = async (audioBlob: Blob, bucketCount = 200): Promise<number[]> => {
   const arrayBuffer = await audioBlob.arrayBuffer();
   const AudioContextCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioContext = new AudioContextCtor();
@@ -28,4 +28,4 @@ export async function computeWaveformPeaks(audioBlob: Blob, bucketCount = 200): 
   } finally {
     await audioContext.close();
   }
-}
+};

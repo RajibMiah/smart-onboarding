@@ -10,7 +10,7 @@ import type { ZoomRegion } from "@/types/zoom";
  * hydrate a resumed editing session, applied here to build a read-only
  * playback payload instead.
  */
-export function hydrateTheaterClip(clip: ApiTheaterClip, assignedPlaylistId: string | null): ProjectMetadataPayload {
+export const hydrateTheaterClip = (clip: ApiTheaterClip, assignedPlaylistId: string | null): ProjectMetadataPayload => {
   const videoAsset = clip.assets.find((asset) => asset.asset_type === "video");
   const duration = Number(clip.duration_seconds) || 0;
 
@@ -101,4 +101,4 @@ export function hydrateTheaterClip(clip: ApiTheaterClip, assignedPlaylistId: str
     createdAt: clip.created_at,
     updatedAt: clip.updated_at,
   };
-}
+};

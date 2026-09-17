@@ -36,12 +36,12 @@ interface UseStudioUploadResult {
   dismissTask: (id: string) => void;
 }
 
-function hasExtension(file: File, extensions: string[]): boolean {
+const hasExtension = (file: File, extensions: string[]): boolean => {
   const name = file.name.toLowerCase();
   return extensions.some((ext) => name.endsWith(ext));
-}
+};
 
-function validate(file: File, kind: UploadKind): string | null {
+const validate = (file: File, kind: UploadKind): string | null => {
   const maxSize = kind === "media" ? MAX_MEDIA_SIZE_BYTES : MAX_OVERLAY_SIZE_BYTES;
   const extensions = kind === "media" ? MEDIA_EXTENSIONS : OVERLAY_EXTENSIONS;
 
@@ -52,7 +52,7 @@ function validate(file: File, kind: UploadKind): string | null {
     return `File exceeds the ${Math.round(maxSize / (1024 * 1024))}MB limit.`;
   }
   return null;
-}
+};
 
 /**
  * Drives the Studio Upload modal: validates each file, hydrates it into the

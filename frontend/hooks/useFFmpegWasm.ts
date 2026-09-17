@@ -65,7 +65,7 @@ const progressListeners = new Set<(ratio: number) => void>();
  * installed `@ffmpeg/ffmpeg` version so the inlining assumptions don't
  * silently drift out from under a dependency bump.
  */
-async function buildFFmpegWorkerBlobURL(): Promise<string> {
+const buildFFmpegWorkerBlobURL = async (): Promise<string> => {
   const [constSrc, errorsSrc, workerSrc] = await Promise.all(
     ["const.js", "errors.js", "worker.js"].map((file) =>
       fetch(`${FFMPEG_JS_BASE_URL}/${file}`).then((res) => res.text()),
@@ -78,9 +78,9 @@ async function buildFFmpegWorkerBlobURL(): Promise<string> {
 
   const combined = [constSrc, errorsSrc, inlinedWorkerSrc].join("\n");
   return URL.createObjectURL(new Blob([combined], { type: "text/javascript" }));
-}
+};
 
-async function loadSharedFFmpeg(): Promise<FFmpeg> {
+const loadSharedFFmpeg = async (): Promise<FFmpeg> => {
   if (sharedFFmpeg?.loaded) return sharedFFmpeg;
   if (!loadPromise) {
     loadPromise = (async () => {
@@ -103,7 +103,7 @@ async function loadSharedFFmpeg(): Promise<FFmpeg> {
     })();
   }
   return loadPromise;
-}
+};
 
 /** Runs `task` after every previously queued ffmpeg operation has settled. */
 const enqueue = <T>(task: () => Promise<T>): Promise<T> => {

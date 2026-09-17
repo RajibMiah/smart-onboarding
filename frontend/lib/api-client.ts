@@ -11,25 +11,25 @@ const API_ROOT = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/
 const ACCESS_TOKEN_KEY = "apc_access_token";
 const REFRESH_TOKEN_KEY = "apc_refresh_token";
 
-function getAccessToken(): string | null {
+const getAccessToken = (): string | null => {
   if (typeof window === "undefined") return null;
   try {
     return localStorage.getItem(ACCESS_TOKEN_KEY);
   } catch {
     return null;
   }
-}
+};
 
-function getRefreshToken(): string | null {
+const getRefreshToken = (): string | null => {
   if (typeof window === "undefined") return null;
   try {
     return localStorage.getItem(REFRESH_TOKEN_KEY);
   } catch {
     return null;
   }
-}
+};
 
-function setTokens(access?: string | null, refresh?: string | null): void {
+const setTokens = (access?: string | null, refresh?: string | null): void => {
   if (typeof window === "undefined") return;
   try {
     if (access) localStorage.setItem(ACCESS_TOKEN_KEY, access);
@@ -37,9 +37,9 @@ function setTokens(access?: string | null, refresh?: string | null): void {
   } catch {
     // Storage unavailable (private browsing, quota) — session just won't persist across reloads.
   }
-}
+};
 
-function clearTokens(): void {
+const clearTokens = (): void => {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -47,7 +47,7 @@ function clearTokens(): void {
   } catch {
     // Nothing to clean up if storage isn't available.
   }
-}
+};
 
 export class ApiError extends Error {
   status: number;
@@ -86,7 +86,7 @@ const extractMessage = (body: unknown): { message: string; fieldErrors: Record<s
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-async function refreshSession(): Promise<boolean> {
+const refreshSession = async (): Promise<boolean> => {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
 
@@ -108,7 +108,7 @@ async function refreshSession(): Promise<boolean> {
       refreshInFlight = null;
     });
   return refreshInFlight;
-}
+};
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -117,7 +117,7 @@ interface RequestOptions {
   _retried?: boolean;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
   const { method = "GET", body, _retried = false } = options;
   const isFormData = body instanceof FormData;
 
@@ -150,7 +150,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   return data as T;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Domain types (mirrors backend/*/serializers.py output)
@@ -595,7 +595,7 @@ export interface MediaAssetUploadInput {
   onProgress?: (percent: number) => void;
 }
 
-function uploadMediaAssetXhr(input: MediaAssetUploadInput): Promise<ApiMediaAsset> {
+const uploadMediaAssetXhr = (input: MediaAssetUploadInput): Promise<ApiMediaAsset> => {
   const form = new FormData();
   if (input.clip) form.set("clip", input.clip);
   form.set("asset_type", input.asset_type);
@@ -628,7 +628,7 @@ function uploadMediaAssetXhr(input: MediaAssetUploadInput): Promise<ApiMediaAsse
 
     xhr.send(form);
   });
-}
+};
 
 export const mediaAssetsApi = {
   list: (params: Record<string, string> = {}) =>

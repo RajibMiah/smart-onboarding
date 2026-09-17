@@ -26,7 +26,7 @@ interface CacheClipInput {
  * caching failure never surfaces to the user, since the backend save this
  * always follows already succeeded.
  */
-export async function cacheClipForOfflineEditing(input: CacheClipInput): Promise<void> {
+export const cacheClipForOfflineEditing = async (input: CacheClipInput): Promise<void> => {
   try {
     const trackDrafts: TimelineClipDraft[] = [];
     for (const clip of input.tracks) {
@@ -62,7 +62,7 @@ export async function cacheClipForOfflineEditing(input: CacheClipInput): Promise
   } catch {
     // Local caching is a pure optimization layered on top of an already-successful save/load.
   }
-}
+};
 
 /**
  * Clears everything a deleted clip left in IndexedDB — its cached project
@@ -70,7 +70,7 @@ export async function cacheClipForOfflineEditing(input: CacheClipInput): Promise
  * thumbnails — so a deletion doesn't leave orphaned local storage behind.
  * Best-effort and always runs after the backend delete already succeeded.
  */
-export async function purgeClipFromLocalCache(clipId: string): Promise<void> {
+export const purgeClipFromLocalCache = async (clipId: string): Promise<void> => {
   try {
     const draft = await indexedDbStorage.getProjectDraft(clipId);
     if (draft) {
@@ -81,4 +81,4 @@ export async function purgeClipFromLocalCache(clipId: string): Promise<void> {
   } catch {
     // Best-effort — the backend delete above already succeeded regardless.
   }
-}
+};

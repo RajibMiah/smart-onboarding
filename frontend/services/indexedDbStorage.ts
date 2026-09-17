@@ -14,20 +14,20 @@ import {
   type ThumbnailRecord,
 } from "@/types/storage";
 
-function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
+const promisifyRequest = <T>(request: IDBRequest<T>): Promise<T> => {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
   });
-}
+};
 
-function promisifyTransaction(transaction: IDBTransaction): Promise<void> {
+const promisifyTransaction = (transaction: IDBTransaction): Promise<void> => {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed"));
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
   });
-}
+};
 
 /**
  * Typed wrapper over the browser's native IndexedDB for `apc_studio_db` — three
